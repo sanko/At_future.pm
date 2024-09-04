@@ -43,6 +43,7 @@
       },
       "runtime" : {
          "requires" : {
+            "Data::Dump" : "0",
             "File::ShareDir::Tiny" : "0",
             "JSON::Tiny" : "0",
             "Path::Tiny" : "0",
