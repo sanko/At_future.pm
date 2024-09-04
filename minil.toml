@@ -1,0 +1,22 @@
+name = "At"
+badges = ["github-actions/ci.yml", "metacpan"]
+module_maker = "ModuleBuildTiny"
+authority = "cpan:SANKO"
+static_install = "auto"
+license = "artistic_2"
+markdown_maker = "Pod::Markdown::Github"
+
+[no_index]
+directory=[
+    "t",
+    "xt",
+    "inc",
+    "share",
+    "eg",
+    "examples",
+    "author",
+    "builder",
+]
+
+[Metadata]
+X_No_Archive = 'Yes'
