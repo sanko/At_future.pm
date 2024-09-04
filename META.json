@@ -1,12 +1,13 @@
 {
-   "abstract" : "It's new $module",
+   "X_No_Archive" : "Yes",
+   "abstract" : "Extra Sweet Bluesky Client Library in Perl",
    "author" : [
       "Sanko Robinson <sanko@cpan.org>"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Minilla/v3.1.25, CPAN::Meta::Converter version 2.150010",
+   "generated_by" : "Minilla/v3.1.23, CPAN::Meta::Converter version 2.150010",
    "license" : [
-      "perl_5"
+      "artistic_2"
    ],
    "meta-spec" : {
       "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
@@ -42,17 +43,111 @@
       },
       "runtime" : {
          "requires" : {
-            "perl" : "5.008001"
+            "File::ShareDir::Tiny" : "0",
+            "JSON::Tiny" : "0",
+            "Path::Tiny" : "0",
+            "Time::Moment" : "0",
+            "URI" : "0",
+            "perl" : "v5.38.0"
          }
       },
       "test" : {
          "requires" : {
-            "Test::More" : "0.98"
+            "Test2::V0" : "0"
          }
       }
    },
    "release_status" : "unstable",
-   "version" : "0.01",
+   "resources" : {
+      "bugtracker" : {
+         "web" : "https://github.com/sanko/At_future.pm/issues"
+      },
+      "homepage" : "https://github.com/sanko/At_future.pm",
+      "repository" : {
+         "type" : "git",
+         "url" : "https://github.com/sanko/At_future.pm.git",
+         "web" : "https://github.com/sanko/At_future.pm"
+      }
+   },
+   "version" : "1.0",
+   "x_authority" : "cpan:SANKO",
+   "x_contributors" : [
+      "Akiomi Kamakura <akiomik@gmail.com>",
+      "Alberto Roura <mail@albertoroura.com>",
+      "Alice <81575558+aliceisjustplaying@users.noreply.github.com>",
+      "Alona Enraght-Moony <nixon.emoony@gmail.com>",
+      "Ansh <anshnanda10@gmail.com>",
+      "Christian De Angelis <christiandeange@gmail.com>",
+      "Connor Stack <sirconnorstack@gmail.com>",
+      "Cooper Edmunds <cooper6789@gmail.com>",
+      "Daniel Holmgren <dtholmgren@gmail.com>",
+      "David Buchanan <d@vidbuchanan.co.uk>",
+      "Dean van Dugteren <31391056+deanpress@users.noreply.github.com>",
+      "Dimitris Apostolou <dimitris.apostolou@icloud.com>",
+      "Elijah <129013612+Evalprime@users.noreply.github.com>",
+      "Emily Liu <emilyliu7321@gmail.com>",
+      "Emily Liu <emilyliu732l@gmail.com>",
+      "Eric Bailey <git@esb.lol>",
+      "Feroz Salam <feroz@argh.in>",
+      "Foysal Ahamed <cfaion341@gmail.com>",
+      "Foysal Ahamed <foysal@blueskyweb.xyz>",
+      "Gabe <gabemeola@gmail.com>",
+      "Hailey <hailey@blueskyweb.xyz>",
+      "Hailey <me@haileyok.com>",
+      "Harlan T Wood <harlantwood@users.noreply.github.com>",
+      "Ilya Siamionau <ilya@marshal.dev>",
+      "Jaga Santagostino <jagasantagostino@gmail.com>",
+      "Jake Gold <52801504+Jacob2161@users.noreply.github.com>",
+      "Jake Gold <jake@blueskyweb.xyz>",
+      "James Garbutt <43081j@users.noreply.github.com>",
+      "Jay Graber <arcalinea@gmail.com>",
+      "Jeff Hodges <jeff@somethingsimilar.com>",
+      "Jerry Chen <jerry@apache.org>",
+      "Jess Porter <github@lolnerd.net>",
+      "Josh Soref <2119212+jsoref@users.noreply.github.com>",
+      "Kim Hallberg <hallberg.kim@gmail.com>",
+      "Markus Amalthea Magnuson <markus@polyscopic.works>",
+      "Mary <148872143+mary-ext@users.noreply.github.com>",
+      "Matthieu Sieben <matthieu.sieben@gmail.com>",
+      "Matthieu Sieben <matthieusieben@users.noreply.github.com>",
+      "Max Graey <maxgraey@gmail.com>",
+      "Michał Gibowski <gibowski@gmail.com>",
+      "Miles Zimmerman <miles@zim.dev>",
+      "Mustafa Yafes Akbaş <62028911+yafesdot@users.noreply.github.com>",
+      "Patrick Linnane <patrick@linnane.io>",
+      "Patryk <Matrix89@users.noreply.github.com>",
+      "Paul Frazee <pfrazee@gmail.com>",
+      "Roj <rojserbest@gmail.com>",
+      "Ryan Barrett <git@ryanb.org>",
+      "Ryan Barrett <github@ryanb.org>",
+      "Ryan Winchester <ryanwinchester@users.noreply.github.com>",
+      "S. Ota <1632335+susumuota@users.noreply.github.com>",
+      "Safa Safari <safasafari.ss@gmail.com>",
+      "Samuel Newman <mozzius@protonmail.com>",
+      "Shinya Kato / 加藤 真也 <contact@shinyakato.dev>",
+      "Shoshána Abigail <72781354+LilahTovMoon@users.noreply.github.com>",
+      "Takumi Fujiwara <jiftech.stlfy@gmail.com>",
+      "Wes Bos <wesbos@gmail.com>",
+      "Wes Todd <wes@wesleytodd.com>",
+      "Whyrusleeping <why@ipfs.io>",
+      "YOCKOW <YOCKOW@users.noreply.github.com>",
+      "Yoshihiro Sugi <sugi1982@gmail.com>",
+      "bnewbold <bnewbold@robocracy.org>",
+      "dan <dan.abramov@gmail.com>",
+      "devin ivy <devinivy@gmail.com>",
+      "dumbmoron <136796770+dumbmoron@users.noreply.github.com>",
+      "futur <me@futuristick.ca>",
+      "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+      "intrnl <intrnl28+github@gmail.com>",
+      "jimmylee <send@jimmy.email>",
+      "joev <105156480+j0ev@users.noreply.github.com>",
+      "mehdiMj <mehdi.is@live.com>",
+      "noriaki watanabe <nabeyang@gmail.com>",
+      "surfdude29 <149612116+surfdude29@users.noreply.github.com>",
+      "this.julio <julio.valerio2@live.lagcc.cuny.edu>",
+      "tsinghuacoder <tsinghuacoder@icloud.com>",
+      "zhuowei <zhuoweizhang@yahoo.com>"
+   ],
    "x_serialization_backend" : "JSON::PP version 4.16",
    "x_static_install" : 1
 }

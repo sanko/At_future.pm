@@ -1,11 +1,11 @@
 package At 1.0 {
     use v5.38;
-    use experimental         qw[try];
+    use experimental qw[try for_list];
     use diagnostics;
     no warnings qw[experimental::builtin];
     use parent               qw[Exporter];
     use Carp                 qw[carp confess];
-    use File::ShareDir::Tiny qw[dist_dir];
+    use File::ShareDir::Tiny qw[dist_dir module_dir];
     use JSON::Tiny           qw[decode_json];
     use Path::Tiny           qw[path];
     use Time::Moment;    # Internal; standardize around Zulu
@@ -22,53 +22,53 @@ package At 1.0 {
         bless { http => $args{http}, service => $args{service} }, $class;
     }
 
-    sub did($self) {
+    sub did ($self) {
         my $session = $self->{http}->session;
         defined $session ? $session->{did} : ();
     }
     #
-    sub createAccount( $s, %args ) {
+    sub createAccount ( $s, %args ) {
         my $session = At::com::atproto::server::createAccount( $s, %args );
         $s->{http}->_set_session($session) if $session;
         $session;
     }
 
-    sub login( $s, %args ) {
+    sub login ( $s, %args ) {
         my $session = At::com::atproto::server::createSession( $s, %args );
         $s->{http}->_set_session($session) if $session;
         $session;
     }
 
-    sub getTimeline( $s, %args ) {
+    sub getTimeline ( $s, %args ) {
         At::app::bsky::feed::getTimeline( $s, %args );
     }
 
-    sub getAuthorFeed( $s, %args ) {
+    sub getAuthorFeed ( $s, %args ) {
         At::app::bsky::feed::getAuthorFeed( $s, %args );
     }
 
-    sub getPostThread( $s, %args ) {
+    sub getPostThread ( $s, %args ) {
         At::app::bsky::feed::getPostThread( $s, %args );
     }
 
-    sub getPost( $s, $uri ) {
+    sub getPost ( $s, $uri ) {
         At::app::bsky::feed::getPosts( $s, uris => [$uri] );
     }
 
-    sub getPosts( $s, %args ) {
+    sub getPosts ( $s, %args ) {
         At::app::bsky::feed::getPosts( $s, %args );
     }
 
-    sub getLikes( $s, %args ) {
+    sub getLikes ( $s, %args ) {
         At::app::bsky::feed::getLikes( $s, %args );
     }
 
     # Jumping ahead for a sec
-    sub getProfile( $s, %args ) {
+    sub getProfile ( $s, %args ) {
         At::app::bsky::actor::getProfile( $s, %args );
     }
 
-    sub upsertProfile( $s, $fn ) {
+    sub upsertProfile ( $s, $fn ) {
         my $repo = $s->did;
         my $existing;
         for ( 0 .. 5 ) {    # Might take a few tries
@@ -115,7 +115,7 @@ package At 1.0 {
     }
 
     # Init
-    sub import( $class, %imports ) {
+    sub import ( $class, %imports ) {
         my $lexicon;    # Allow user to define where lexicon snapshots are to be found
         try {
             $lexicon = delete $imports{'-lexicon'} // dist_dir(__PACKAGE__);
@@ -125,7 +125,7 @@ package At 1.0 {
         }
         finally {
             $lexicon = path($lexicon) unless builtin::blessed $lexicon;
-            $lexicon = $lexicon->child(qw[atproto lexicons])->realpath
+            $lexicon = $lexicon->child('lexicons')->realpath
         }
         #
         my $iter = $lexicon->iterator( { recurse => 1 } );
@@ -184,7 +184,7 @@ package At 1.0 {
         }
     }
 
-    sub _namespace2package($fqdn) {
+    sub _namespace2package ($fqdn) {
         my $namespace = $fqdn =~ s[[#\.]][::]gr;
         'At::Lexicon::' . $namespace;
     }
@@ -250,7 +250,7 @@ package At 1.0 {
         }
     );
 
-    sub _coerce( $namespace, $schema, $data ) {
+    sub _coerce ( $namespace, $schema, $data ) {
         $data // return ();
         return $coercions{ $schema->{type} }->( $namespace, $schema, $data ) if defined $coercions{ $schema->{type} };
         die 'Unknown coercion: ' . $schema->{type};
@@ -378,7 +378,9 @@ Host for the service.
 
 Comma separated string of language codes (e.g. C<en-US,en;q=0.9,fr>).
 
-Bluesky recommends sending the C<Accept-Language> header to get posts in the user's preferred language. See L<https://www.w3.org/International/questions/qa-lang-priorities.en> and L<https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry>.
+Bluesky recommends sending the C<Accept-Language> header to get posts in the user's preferred language. See
+L<https://www.w3.org/International/questions/qa-lang-priorities.en> and
+L<https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry>.
 
 =back
 
@@ -402,13 +404,13 @@ There are two ways to manage sessions:
 
 =back
 
-Developers of new code should be aware that the AT protocol will be
-L<transitioning to OAuth in over the next year or so (2024-2025)|https://github.com/bluesky-social/atproto/discussions/2656>.
+Developers of new code should be aware that the AT protocol will be L<transitioning to OAuth in over the next year or
+so (2024-2025)|https://github.com/bluesky-social/atproto/discussions/2656>.
 
 =head2 App password based session management
 
-Please note that this auth method is deprecated in favor of OAuth based session management. It is recommended to use OAuth based
-session management.
+Please note that this auth method is deprecated in favor of OAuth based session management. It is recommended to use
+OAuth based session management.
 
 =head3 C<createAccount( ... )>
 
@@ -511,8 +513,7 @@ Most of a core client's functionality is covered by these methods.
 
 =head2 C<getTimeline( ... )>
 
-Get a view of the requesting account's home timeline. This is expected to be some form of
-reverse-chronological feed.
+Get a view of the requesting account's home timeline. This is expected to be some form of reverse-chronological feed.
 
     my $timeline = $bsky->getTimeline( );
 
@@ -582,7 +583,8 @@ Known values:
 
 =head2 C<getPostThread( ... )>
 
-Get posts in a thread. Does not require auth, but additional metadata and filtering will be applied for authed requests.
+Get posts in a thread. Does not require auth, but additional metadata and filtering will be applied for authed
+requests.
 
     $at->getPostThread(
         uri => 'at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3l2s5xxv2ze2c'
@@ -628,7 +630,8 @@ Reference (AT-URI) to post record.
 
 =head2 C<getPosts( ... )>
 
-Gets post views for a specified list of posts (by AT-URI). This is sometimes referred to as 'hydrating' a 'feed skeleton'.
+Gets post views for a specified list of posts (by AT-URI). This is sometimes referred to as 'hydrating' a 'feed
+skeleton'.
 
     my $posts = $at->getPosts(
         uris => [

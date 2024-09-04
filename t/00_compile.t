@@ -21,7 +21,7 @@ subtest 'clones correctly' => sub {
     is $agent1->{service}, $agent2->{service}, 'services match';
 };
 
-sub getProfileDisplayName($at) {
+sub getProfileDisplayName ($at) {
     $at->getProfile( actor => $at->did, rkey => 'self' )->{displayName} // ();
 }
 subtest 'upsertProfile correctly handles CAS failures' => sub {
