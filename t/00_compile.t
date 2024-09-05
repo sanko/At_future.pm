@@ -35,9 +35,17 @@ subtest 'upsertProfile correctly handles CAS failures' => sub {
         }
         ),
         'upsertProfile';
-        diag 'giving Bluesky a moment to catch up...';
-        sleep 3; # Bluesky might take a little time to commit changes
-    isnt $original, getProfileDisplayName($agent), 'displayName has changed';
+    #
+    {
+        my $todo = todo 'Bluesky might take a little time to commit changes';
+        my $ok   = 0;
+        for ( 1 .. 3 ) {
+            last if $ok = $original ne getProfileDisplayName($agent);
+            diag 'giving Bluesky a moment to catch up...';
+            sleep 2;
+        }
+        ok $ok, 'displayName has changed';
+    }
 };
 #
 done_testing;
