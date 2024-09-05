@@ -118,7 +118,7 @@ package At 1.0 {
     sub import ( $class, %imports ) {
         my $lexicon;    # Allow user to define where lexicon snapshots are to be found
         try {
-            $lexicon = delete $imports{'-lexicon'} // dist_dir(__PACKAGE__);
+            $lexicon = delete $imports{'-lexicons'} // dist_dir(__PACKAGE__);
         }
         catch ($error) {
             $lexicon = './share'

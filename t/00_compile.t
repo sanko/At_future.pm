@@ -9,7 +9,8 @@ use lib '../eg/', 'eg', '../lib', 'lib';
 # Public and totally worthless
 my %auth = ( identifier => 'atperl.bsky.social', password => 'ck2f-bqxl-h54l-xm3l' );
 #
-use At;
+use if -d '../share',  At => -lexicons => '../share';
+use if !-d '../share', At => ();
 #
 subtest 'should retrieve the api app' => sub {
     isa_ok my $agent = At->new( service => 'https://bsky.social' ), ['At'];
@@ -34,6 +35,8 @@ subtest 'upsertProfile correctly handles CAS failures' => sub {
         }
         ),
         'upsertProfile';
+        diag 'giving Bluesky a moment to catch up...';
+        sleep 3; # Bluesky might take a little time to commit changes
     isnt $original, getProfileDisplayName($agent), 'displayName has changed';
 };
 #
