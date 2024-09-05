@@ -117,7 +117,7 @@ jobs:
       - env:
           DATA: |
             {
-              "perl":  ["5.40.0", "5.38.2"],
+              "perl":  ["5.38.2", "5.40.0"],
               "flags": ["", "-Dusethreads", "-Duselongdouble", "-Dusequadmath"]
             }
         id: matrix
@@ -130,7 +130,7 @@ jobs:
       fail-fast: false
       matrix:
         exclude:
-          - perl: 5.34.3
+          - perl: 5.40.0
           - flags: -Duselongdouble
           - flags: -Dusequadmath
         flags:
