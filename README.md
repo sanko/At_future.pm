@@ -1,7 +1,7 @@
 [![Actions Status](https://github.com/sanko/At_future.pm/actions/workflows/ci.yml/badge.svg)](https://github.com/sanko/At_future.pm/actions) [![MetaCPAN Release](https://badge.fury.io/pl/At.svg)](https://metacpan.org/release/At)
 # NAME
 
-At - Extra Sweet Bluesky Client Library in Perl
+At - The AT Protocol for Social Networking
 
 # SYNOPSIS
 

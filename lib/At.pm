@@ -344,7 +344,7 @@ __END__
 
 =head1 NAME
 
-At - Extra Sweet Bluesky Client Library in Perl
+At - The AT Protocol for Social Networking
 
 =head1 SYNOPSIS
 
