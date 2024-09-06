@@ -31,3 +31,5 @@ MYMETA.*
 /At-*
 
 .tidyall.d/
+
+eg/demo.pl

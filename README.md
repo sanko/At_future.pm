@@ -304,7 +304,27 @@ Expected parameters include:
 
 ## `getRepostedBy( ... )`
 
-TODO
+Get a list of reposts for a given post.
+
+```perl
+my $likes = $at->getRepostedBy( uri => 'at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3l2s5xxv2ze2c' );
+```
+
+Expected parameters include:
+
+- `uri` - required
+
+    Reference (AT-URI) of post record.
+
+- `cid`
+
+    If supplied, filters to reposts of specific version (by CID) of the post record.
+
+- `limit`
+
+    The number of reposts to return per page in the range of `1 .. 100`; the default is `50`.
+
+- `cursor`
 
 ## `post( ... )`
 

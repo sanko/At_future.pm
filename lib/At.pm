@@ -16,15 +16,19 @@ package At 1.0 {
     $|++;
     #
     sub new ( $class, %args ) {
-        $args{service} // Carp::croak 'At requires a host';
+        $args{service} // Carp::croak 'At requires a service';
         $args{service} = URI->new( $args{service} ) unless builtin::blessed $args{service};
         $args{http} //= Mojo::UserAgent->can('start') ? At::UserAgent::Mojo->new(%args) : At::UserAgent::Tiny->new(%args);
         bless { http => $args{http}, service => $args{service} }, $class;
     }
 
-    sub did ($self) {
-        my $session = $self->{http}->session;
+    sub did ($s) {
+        my $session = $s->{http}->session;
         defined $session ? $session->{did} : ();
+    }
+
+    sub session($s) {
+        $s->{http}->session;
     }
     #
     sub createAccount ( $s, %args ) {
@@ -63,6 +67,18 @@ package At 1.0 {
         At::app::bsky::feed::getLikes( $s, %args );
     }
 
+    sub getRepostedBy ( $s, %args ) {
+        At::app::bsky::feed::getRepostedBy( $s, %args );
+    }
+
+    #~ await agent.getRepostedBy(params, opts)
+    #~ await agent.post(record)
+    #~ await agent.deletePost(postUri)
+    #~ await agent.like(uri, cid)
+    #~ await agent.deleteLike(likeUri)
+    #~ await agent.repost(uri, cid)
+    #~ await agent.deleteRepost(repostUri)
+    #~ await agent.uploadBlob(data, opts)
     # Jumping ahead for a sec
     sub getProfile ( $s, %args ) {
         At::app::bsky::actor::getProfile( $s, %args );
@@ -679,7 +695,29 @@ The number of likes to return per page in the range of C<1 .. 100>; the default 
 
 =head2 C<getRepostedBy( ... )>
 
-TODO
+Get a list of reposts for a given post.
+
+    my $likes = $at->getRepostedBy( uri => 'at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3l2s5xxv2ze2c' );
+
+Expected parameters include:
+
+=over
+
+=item C<uri> - required
+
+Reference (AT-URI) of post record.
+
+=item C<cid>
+
+If supplied, filters to reposts of specific version (by CID) of the post record.
+
+=item C<limit>
+
+The number of reposts to return per page in the range of C<1 .. 100>; the default is C<50>.
+
+=item C<cursor>
+
+=back
 
 =head2 C<post( ... )>
 
