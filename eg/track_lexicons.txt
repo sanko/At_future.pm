@@ -8,6 +8,6 @@ $ git commit
 
 # Update lexicons with this:
 $ git merge -s ours --no-commit atproto/main --allow-unrelated-histories
-$ git rm -rf lexicons
+$ git rm -rf share/lexicons
 $ git read-tree --prefix=share/lexicons/ -u atproto/main:lexicons
 $ git commit

@@ -95,25 +95,14 @@ subtest 'pull post' => sub {
         end;
     }, 'getPost( ... )';
 };
-
-#~ my $likes = $at->getRepostedBy( uri => 'at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3l2s5xxv2ze2c' );
-#~ my $original = getProfileDisplayName($bsky);
-#~ ok $bsky->upsertProfile(
-#~ sub (%existing) {
-#~ %existing, displayName => localtime . ' [' . ( int rand time ) . ']';
-#~ }
-#~ ),
-#~ 'upsertProfile';
-#~ #
-#~ {
-#~ my $todo = todo 'Bluesky might take a little time to commit changes';
-#~ my $ok   = 0;
-#~ for ( 1 .. 3 ) {
-#~ last if $ok = $original ne getProfileDisplayName($bsky);
-#~ diag 'giving Bluesky a moment to catch up...';
-#~ sleep 2;
-#~ }
-#~ ok $ok, 'displayName has changed';
-#~ }
+subtest 'pull reposts' => sub {
+    is my $reposts = $bsky->getRepostedBy( uri => 'at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3l2s5xxv2ze2c' ), hash {
+        field cursor     => D();
+        field cid        => E();
+        field repostedBy => D();    # array
+        field uri        => D();    # AT-uri
+        end;
+    }, 'getRepostedBy( ... )';
+};
 #
 done_testing;
