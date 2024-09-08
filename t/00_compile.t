@@ -18,6 +18,15 @@ my $bsky;
 sub getProfileDisplayName () {
     $bsky->getProfile( actor => $bsky->did, rkey => 'self' )->{displayName} // ();
 }
+subtest core => sub {
+    subtest 'verify object' => sub {
+        my $todo      = todo 'verify() does not work yet';
+        my $fake_post = At::Lexicon::app::bsky::feed::post->new( test => 'this' );
+        ok $fake_post->verify(), 'verify';
+    };
+};
+
+#~ exit;
 #
 subtest 'should build the client' => sub {
     isa_ok $bsky = At->new( service => 'https://bsky.social' ), ['At'];

@@ -113,18 +113,28 @@ package At 1.0 {
             $current_ref->{ $path_components[-1] } = $schema;
             {
                 no strict 'refs';
-                *{ _namespace2package($namespace) . '::new' } = sub ( $class, $args ) {
+                *{ _namespace2package($namespace) . '::new' } = sub ( $class, %args ) {
 
                     # Only verify if fields are missing
-                    my @missing = sort grep { !defined $args->{$_} } @{ $schema->{required} };
+                    my @missing = sort grep { !defined $args{$_} } @{ $schema->{required} };
                     Carp::croak sprintf 'missing required field%s in %s->new(...): %s', ( scalar @missing == 1 ? '' : 's' ), $class, join ', ',
                         @missing
                         if @missing;
-                    bless $args, $class;
+                    bless \%args, $class;
                 };
+                for my $property ( keys %{ $schema->{properties} } ) {
+                    *{ _namespace2package($namespace) . '::' . $property } = sub ($s) {
+                        $s->{$property};
+                    }
+                }
                 *{ _namespace2package($namespace) . '::verify' } = sub ($s) {
 
                     # TODO: verify that data fills schema requirements
+                    ddx $schema;
+                    ddx $s;
+                    return 0;    # This doesn't work yet.
+
+                    #~ exit;
                 };
             }
         }
@@ -192,7 +202,7 @@ package At 1.0 {
                         _set_capture( $fqdn, $schema->{output}{schema} );
                     }
                     elsif ( $schema->{type} eq 'record' ) {
-                        _set_capture( $raw->{id} . '.' . ( $name eq 'main' ? '' : $name ), $schema );
+                        _set_capture( join( '.', $raw->{id}, ( $name eq 'main' ? () : $name ) ), $schema );
                     }
                     elsif ( $schema->{type} eq 'string' )       { }
                     elsif ( $schema->{type} eq 'subscription' ) { }
@@ -235,13 +245,13 @@ package At 1.0 {
             for my ( $name, $subschema )( %{ $schema->{properties} } ) {
                 $data->{$name} = _coerce( $namespace, $subschema, $data->{$name} );
             }
-            _namespace2package($namespace)->new($data);
+            _namespace2package($namespace)->new(%$data);
         },
         ref => sub ( $namespace, $schema, $data ) {
             $namespace = _namespace( $namespace, $schema->{ref} );
             my $ref_schema = _get_capture($namespace);
             $ref_schema // Carp::carp( 'Unknown type: ' . $namespace ) && return $data;
-            _namespace2package($namespace)->new( _coerce( $namespace, $ref_schema, $data ) );
+            _coerce( $namespace, $ref_schema, $data );
         },
         union => sub ( $namespace, $schema, $data ) {
             my @namespaces = map { _namespace( $namespace, $_ ) } @{ $schema->{refs} };
