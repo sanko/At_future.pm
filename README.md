@@ -17,7 +17,7 @@ You shouldn't need to know the AT protocol in order to get things done but it wo
 
 # Core Methods
 
-This atprot client includes the following methods to cover the most common operations.
+This atproto client includes the following methods to cover the most common operations.
 
 ## `new( ... )`
 

@@ -24,6 +24,12 @@ subtest core => sub {
         my $fake_post = At::Lexicon::app::bsky::feed::post->new( test => 'this' );
         ok $fake_post->verify(), 'verify';
     };
+    subtest 'verify token generation' => sub {
+        is At::Lexicon::com::atproto::moderation::defs::reasonSpam(), 'com.atproto.moderation.defs#reasonSpam',
+            'At::Lexicon::com::atproto::moderation::defs::reasonSpam()';
+        is At::Lexicon::com::atproto::moderation::defs::reasonViolation(), 'com.atproto.moderation.defs#reasonViolation',
+            'At::Lexicon::com::atproto::moderation::defs::reasonViolation()';
+    };
 };
 
 #~ exit;

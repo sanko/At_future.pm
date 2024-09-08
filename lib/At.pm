@@ -123,15 +123,20 @@ package At 1.0 {
                     bless \%args, $class;
                 };
                 for my $property ( keys %{ $schema->{properties} } ) {
-                    *{ _namespace2package($namespace) . '::' . $property } = sub ($s) {
+                    *{ _namespace2package($namespace) . '::' . $property } = sub ( $s, $new //= () ) {
+                        $s->{$property} = $new if defined $new;
                         $s->{$property};
                     }
                 }
                 *{ _namespace2package($namespace) . '::verify' } = sub ($s) {
 
                     # TODO: verify that data fills schema requirements
-                    ddx $schema;
+                    #~ ddx $schema;
                     ddx $s;
+                    for my $property ( keys %{ $schema->{properties} } ) {
+                        ddx $property;
+                        ddx $schema->{properties}{$property};
+                    }
                     return 0;    # This doesn't work yet.
 
                     #~ exit;
@@ -208,15 +213,12 @@ package At 1.0 {
                     elsif ( $schema->{type} eq 'subscription' ) { }
                     elsif ( $schema->{type} eq 'token' ) {    # Generally just a string
                         my $namespace = $fqdn =~ s[[#\.]][::]gr;
+                        my $package   = _namespace2package($fqdn);
                         no strict 'refs';
-                        my $package = _namespace2package($fqdn);
-                        *{ $package . "::(\"\"" } = sub ( $s, $u, $q ) {
-                            $$s;
-                        };
-                        *{ $package . "::((" }  = sub {...};
-                        *{ $package . '::new' } = sub ( $class, $token ) {
-                            bless \$token, $class;
-                        };
+
+                        #~ *{ $package . "::(\"\"" } = sub ( $s, $u, $q ) { $fqdn };
+                        #~ *{ $package . "::((" }  = sub {$fqdn};
+                        *{$package} = sub ( ) { $fqdn; };
                     }
                     else {
                         ...;
@@ -402,7 +404,7 @@ You shouldn't need to know the AT protocol in order to get things done but it wo
 
 =head1 Core Methods
 
-This atprot client includes the following methods to cover the most common operations.
+This atproto client includes the following methods to cover the most common operations.
 
 =head2 C<new( ... )>
 
@@ -947,7 +949,7 @@ Sanko Robinson E<lt>sanko@cpan.orgE<gt>
 
 =begin stopwords
 
-Bluesky unfollow
+atproto Bluesky unfollow reposts auth authed login aka eg
 
 =end stopwords
 
