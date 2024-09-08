@@ -128,6 +128,12 @@ package At 1.0 {
                         $s->{$property};
                     }
                 }
+                *{ _namespace2package($namespace) . '::_schema' } = sub ($s) {
+                    $schema;
+                };
+                *{ _namespace2package($namespace) . '::_namespace' } = sub ($s) {
+                    $namespace;
+                };
                 *{ _namespace2package($namespace) . '::verify' } = sub ($s) {
 
                     # TODO: verify that data fills schema requirements
@@ -305,7 +311,9 @@ package At 1.0 {
 package    #
     At::Error 1.0 {
     use v5.38;
-    use overload 'bool' => sub {0};
+    use overload
+        bool => sub {0},
+        '""' => sub ( $s, $u, $q ) { $s->{message} // 'Unknown error' };
     sub new ( $class, $args ) { bless $args, $class }
 }
 package    #
@@ -316,6 +324,7 @@ package    #
     sub post {...}
     sub _set_session ( $s, $session ) {...}
     sub session      ($s)             {...}
+    sub ratelimit    ($s)             {...}
 }
 package    #
     At::UserAgent::Tiny 1.0 {
@@ -341,6 +350,10 @@ package    #
             = $s->{agent}
             ->get( $url . ( defined $req->{content} && keys %{ $req->{content} } ? '?' . $s->{agent}->www_form_urlencode( $req->{content} ) : '' ),
             { defined $req->{headers} ? ( headers => $req->{headers} ) : () } );
+
+        #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
+        #~ https://www.ietf.org/archive/id/draft-polli-ratelimit-headers-02.html
+        $s->{ratelimit}{$_} = $res->{headers}{ 'ratelimit-' . $_ } // () for qw[limit policy remaining reset];
         return At::Error->new( decode_json $res->{content} ) if !$res->{success};
         return $res->{content} = decode_json $res->{content} if $res->{content} && $res->{headers}{'content-type'} =~ m[application/json];
         return $res;
@@ -353,6 +366,11 @@ package    #
                 defined $req->{content} ? ( content => ref $req->{content} ? encode_json $req->{content} : $req->{content} ) : ()
             }
         );
+
+        #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
+        #~ https://www.ietf.org/archive/id/draft-polli-ratelimit-headers-02.html
+        $s->{ratelimit}{$_} = $res->{headers}{ 'ratelimit-' . $_ } // () for qw[limit policy remaining reset];
+        use Data::Dump;
         return At::Error->new( decode_json $res->{content} ) if !$res->{success};
         return $res->{content} = decode_json $res->{content} if $res->{content} && $res->{headers}{'content-type'} =~ m[application/json];
         return $res;
@@ -370,6 +388,10 @@ package    #
 
     sub _set_bearer_token ( $s, $token ) {
         $s->{agent}->{default_headers}{Authorization} = $token;
+    }
+
+    sub ratelimit($s) {
+        $s->{ratelimit} // ();
     }
 }
 package    #
