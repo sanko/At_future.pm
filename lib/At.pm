@@ -16,8 +16,8 @@ package At 1.0 {
     #
     $|++;
     #
-    sub _percent ( $limit, $remaining ) { ( ( $limit / $remaining ) * 100 ) }
-    sub _plural( $count, $word )        { $count ? sprintf '%d %s%s', $count, $word, $count == 1 ? '' : 's' : () }
+    sub _percent ( $limit, $remaining ) { $remaining && $limit ? ( ( $limit / $remaining ) * 100 ) : 0 }
+    sub _plural( $count, $word ) { $count ? sprintf '%d %s%s', $count, $word, $count == 1 ? '' : 's' : () }
 
     sub _duration ($seconds) {
         $seconds || return '0 seconds';
@@ -36,10 +36,8 @@ package At 1.0 {
         bless {
             http       => $args{http},
             service    => $args{service},
-            ratelimits => {
-
-                #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
-                '*'           => {},
+            ratelimits => {                 #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
+                global        => {},
                 updateHandle  => {},    # per DID
                 updateHandle  => {},    # per DID
                 createSession => {},    # per handle
@@ -49,10 +47,21 @@ package At 1.0 {
         }, $class;
     }
 
-    sub ratelimit ( $s, $type //= '*', $meta //= () ) {
+    sub ratelimit ( $s, $type //= 'global', $meta //= () ) {
 
         #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
         defined $meta ? $s->{ratelimits}{$type}{$meta} : $s->{ratelimits}{$type};
+    }
+
+    sub _ratecheck( $rate, $type ) {
+        $rate->{reset} // return;
+        return warnings::warnif( At => sprintf 'Over %s rate limit. Try again in %s', $type, _duration( $rate->{reset} - time ) )
+            if defined $rate->{reset} && $rate->{remaining} == 0 && $rate->{reset} > time;
+        my $percent = _percent( $rate->{remaining}, $rate->{limit} );
+        warnings::warnif(
+            At => sprintf '%.2f of %s rate limit remaining (%d of %d). Slow down or try again in %s',
+            $percent, $type, $rate->{remaining}, $rate->{limit}, _duration( $rate->{reset} - time )
+        ) if $percent <= 5;
     }
 
     sub did ($s) {
@@ -65,33 +74,22 @@ package At 1.0 {
     }
     #
     sub createAccount ( $s, %args ) {
+        _ratecheck( $s->{ratelimits}{createAccount}, 'createAccount' );
         my $session = At::com::atproto::server::createAccount( $s, %args );
         $s->{http}->_set_session($session) if $session;
+        _ratecheck( $s->{ratelimits}{createAccount}, 'createAccount' );
         $session;
     }
 
     sub login ( $s, %args ) {
-        warnings::warnif(
-            At => sprintf 'Over rate limit. Try again in %s',
-            _duration( $s->{ratelimits}{createSession}{ $args{identifier} }{reset} - time )
-            )
-            if defined $s->{ratelimits}{createSession}{ $args{identifier} }{reset} &&
-            $s->{ratelimits}{createSession}{ $args{identifier} }{remaining} &&
-            $s->{ratelimits}{createSession}{ $args{identifier} }{reset} > time;
+        _ratecheck( $s->{ratelimits}{createSession}{ $args{identifier} }, 'createSession' );
         my ( $session, $headers ) = At::com::atproto::server::createSession( $s, %args );
         $session || return $session;
         $s->{http}->_set_session($session);
 
         #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
         $s->{ratelimits}{createSession}{ $args{identifier} }{$_} = $headers->{ 'ratelimit-' . $_ } for qw[limit remaining reset];
-        my $percent = _percent( $s->{ratelimits}{createSession}{ $args{identifier} }{remaining},
-            $s->{ratelimits}{createSession}{ $args{identifier} }{limit} );
-        warnings::warnif(
-            At => sprintf 'Used %.2f of rate limit (%d of %d). Try again in %s',
-            100 - $percent, $s->{ratelimits}{createSession}{ $args{identifier} }{remaining},
-            $s->{ratelimits}{createSession}{ $args{identifier} }{limit},
-            _duration( $s->{ratelimits}{createSession}{ $args{identifier} }{reset} - time )
-        ) if $percent <= 5;
+        _ratecheck( $s->{ratelimits}{createSession}{ $args{identifier} }, 'createSession' );
         $session;
     }
 
@@ -249,7 +247,12 @@ package At 1.0 {
                         my @namespace = split /\./, $fqdn;
                         no strict 'refs';
                         *{ join '::', 'At', @namespace } = sub ( $s, %args ) {
+                            _ratecheck( $s->{ratelimits}{global}, 'global' );
                             my ( $content, $headers ) = $s->{http}->post( $s->{service}->as_string . ( '/xrpc/' . $fqdn ), { content => \%args } );
+
+                            #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
+                            $s->{ratelimits}{global}{$_} = $headers->{ 'ratelimit-' . $_ } for qw[limit remaining reset];
+                            _ratecheck( $s->{ratelimits}{global}, 'global' );
                             $content = builtin::blessed $content? $content : _coerce( $fqdn, $schema->{output}{schema}, $content );
                             wantarray ? ( $content, $headers ) : $content;
                         };
@@ -259,9 +262,14 @@ package At 1.0 {
                         my @namespace = split /\./, $fqdn;
                         no strict 'refs';
                         *{ join '::', 'At', @namespace } = sub ( $s, %args ) {
+                            _ratecheck( $s->{ratelimits}{global}, 'global' );
 
                             # ddx $schema;
                             my ( $content, $headers ) = $s->{http}->get( $s->{service}->as_string . ( '/xrpc/' . $fqdn ), { content => \%args } );
+
+                            #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
+                            $s->{ratelimits}{global}{$_} = $headers->{ 'ratelimit-' . $_ } for qw[limit remaining reset];
+                            _ratecheck( $s->{ratelimits}{global}, 'global' );
                             $content = builtin::blessed $content? $content : _coerce( $fqdn, $schema->{output}{schema}, $content );
                             wantarray ? ( $content, $headers ) : $content;
                         };
