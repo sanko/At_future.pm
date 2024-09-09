@@ -1,5 +1,6 @@
 package At 1.0 {
     use v5.38;
+    use warnings::register;
     use experimental qw[try for_list];
     use diagnostics;
     no warnings qw[experimental::builtin];
@@ -15,11 +16,32 @@ package At 1.0 {
     #
     $|++;
     #
+    sub _percent( $to, $from ) { ( ( $to - $from ) / $from ) * 100 }
+    #
     sub new ( $class, %args ) {
         $args{service} // Carp::croak 'At requires a service';
         $args{service} = URI->new( $args{service} ) unless builtin::blessed $args{service};
         $args{http} //= Mojo::UserAgent->can('start') ? At::UserAgent::Mojo->new(%args) : At::UserAgent::Tiny->new(%args);
-        bless { http => $args{http}, service => $args{service} }, $class;
+        bless {
+            http       => $args{http},
+            service    => $args{service},
+            ratelimits => {
+
+                #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
+                '*'           => {},
+                updateHandle  => {},    # per DID
+                updateHandle  => {},    # per DID
+                createSession => {},    # per handle
+                deleteAccount => {},    # by IP
+                resetPassword => {}     # by IP
+            }
+        }, $class;
+    }
+
+    sub ratelimit ( $s, $type //= '*', $meta //= () ) {
+
+        #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
+        defined $meta ? $s->{ratelimits}{$type}{$meta} : $s->{ratelimits}{$type};
     }
 
     sub did ($s) {
@@ -38,8 +60,12 @@ package At 1.0 {
     }
 
     sub login ( $s, %args ) {
-        my $session = At::com::atproto::server::createSession( $s, %args );
-        $s->{http}->_set_session($session) if $session;
+        my ( $session, $headers ) = At::com::atproto::server::createSession( $s, %args );
+        $session || return $session;
+        $s->{http}->_set_session($session);
+
+        #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
+        $s->{ratelimits}{createSession}{ $args{identifier} }{$_} = $headers->{ 'ratelimit-' . $_ } for qw[limit remaining reset];
         $session;
     }
 
@@ -138,10 +164,11 @@ package At 1.0 {
 
                     # TODO: verify that data fills schema requirements
                     #~ ddx $schema;
-                    ddx $s;
+                    #~ ddx $s;
                     for my $property ( keys %{ $schema->{properties} } ) {
-                        ddx $property;
-                        ddx $schema->{properties}{$property};
+
+                        #~ ddx $property;
+                        #~ ddx $schema->{properties}{$property};
                     }
                     return 0;    # This doesn't work yet.
 
@@ -196,8 +223,9 @@ package At 1.0 {
                         my @namespace = split /\./, $fqdn;
                         no strict 'refs';
                         *{ join '::', 'At', @namespace } = sub ( $s, %args ) {
-                            my $res = $s->{http}->post( $s->{service}->as_string . ( '/xrpc/' . $fqdn ), { content => \%args } );
-                            builtin::blessed $res? $res : _coerce( $fqdn, $schema->{output}{schema}, $res );
+                            my ( $content, $headers ) = $s->{http}->post( $s->{service}->as_string . ( '/xrpc/' . $fqdn ), { content => \%args } );
+                            $content = builtin::blessed $content? $content : _coerce( $fqdn, $schema->{output}{schema}, $content );
+                            wantarray ? ( $content, $headers ) : $content;
                         };
                         _set_capture( $fqdn, $schema->{output}{schema} );
                     }
@@ -207,8 +235,9 @@ package At 1.0 {
                         *{ join '::', 'At', @namespace } = sub ( $s, %args ) {
 
                             # ddx $schema;
-                            my $res = $s->{http}->get( $s->{service}->as_string . ( '/xrpc/' . $fqdn ), { content => \%args } );
-                            builtin::blessed $res? $res : _coerce( $fqdn, $schema->{output}{schema}, $res );
+                            my ( $content, $headers ) = $s->{http}->get( $s->{service}->as_string . ( '/xrpc/' . $fqdn ), { content => \%args } );
+                            $content = builtin::blessed $content? $content : _coerce( $fqdn, $schema->{output}{schema}, $content );
+                            wantarray ? ( $content, $headers ) : $content;
                         };
                         _set_capture( $fqdn, $schema->{output}{schema} );
                     }
@@ -332,6 +361,8 @@ package    #
     use parent -norequire, 'At::UserAgent';
     use HTTP::Tiny;
     use JSON::Tiny qw[decode_json encode_json];
+    use warnings::register;
+    no warnings qw[experimental::builtin];
     #
     sub new ( $class, %args ) {
         $args{agent} //= HTTP::Tiny->new(
@@ -350,13 +381,12 @@ package    #
             = $s->{agent}
             ->get( $url . ( defined $req->{content} && keys %{ $req->{content} } ? '?' . $s->{agent}->www_form_urlencode( $req->{content} ) : '' ),
             { defined $req->{headers} ? ( headers => $req->{headers} ) : () } );
-
-        #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
-        #~ https://www.ietf.org/archive/id/draft-polli-ratelimit-headers-02.html
-        $s->{ratelimit}{$_} = $res->{headers}{ 'ratelimit-' . $_ } // () for qw[limit policy remaining reset];
-        return At::Error->new( decode_json $res->{content} ) if !$res->{success};
-        return $res->{content} = decode_json $res->{content} if $res->{content} && $res->{headers}{'content-type'} =~ m[application/json];
-        return $res;
+        if ( !$res->{success} ) {
+            my $err = At::Error->new( decode_json $res->{content} );
+            return wantarray ? ( $err, $res->{headers} ) : $err;
+        }
+        $res->{content} = decode_json $res->{content} if $res->{content} && $res->{headers}{'content-type'} =~ m[application/json];
+        wantarray ? ( $res->{content}, $res->{headers} ) : $res->{content};
     }
 
     sub post ( $s, $url, $req = () ) {
@@ -366,14 +396,12 @@ package    #
                 defined $req->{content} ? ( content => ref $req->{content} ? encode_json $req->{content} : $req->{content} ) : ()
             }
         );
-
-        #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
-        #~ https://www.ietf.org/archive/id/draft-polli-ratelimit-headers-02.html
-        $s->{ratelimit}{$_} = $res->{headers}{ 'ratelimit-' . $_ } // () for qw[limit policy remaining reset];
-        use Data::Dump;
-        return At::Error->new( decode_json $res->{content} ) if !$res->{success};
-        return $res->{content} = decode_json $res->{content} if $res->{content} && $res->{headers}{'content-type'} =~ m[application/json];
-        return $res;
+        if ( !$res->{success} ) {
+            my $err = At::Error->new( decode_json $res->{content} );
+            return wantarray ? ( $err, $res->{headers} ) : $err;
+        }
+        $res->{content} = decode_json $res->{content} if $res->{content} && $res->{headers}{'content-type'} =~ m[application/json];
+        wantarray ? ( $res->{content}, $res->{headers} ) : $res->{content};
     }
     sub websocket ( $s, $url, $req = () ) {...}
 

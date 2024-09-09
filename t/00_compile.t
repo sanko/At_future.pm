@@ -11,6 +11,8 @@ my %auth = ( identifier => 'atperl.bsky.social', password => 'ck2f-bqxl-h54l-xm3
 #
 use if -d '../share',  At => -lexicons => '../share';
 use if !-d '../share', At => ();
+
+#~ use warnings 'At';
 #
 my $bsky;
 
@@ -63,22 +65,25 @@ SKIP: {
     subtest 'upsertProfile correctly handles CAS failures' => sub {
         $login || skip_all "$login";
         my $original = getProfileDisplayName();
-        ok $bsky->upsertProfile(
-            sub (%existing) {
-                %existing, displayName => localtime . ' [' . ( int rand time ) . ']';
+    SKIP: {
+            $original // skip 'failed to get display name';
+            ok $bsky->upsertProfile(
+                sub (%existing) {
+                    %existing, displayName => localtime . ' [' . ( int rand time ) . ']';
+                }
+                ),
+                'upsertProfile';
+            #
+            {
+                my $todo = todo 'Bluesky might take a little time to commit changes';
+                my $ok   = 0;
+                for ( 1 .. 3 ) {
+                    last if $ok = $original ne getProfileDisplayName();
+                    diag 'giving Bluesky a moment to catch up...';
+                    sleep 2;
+                }
+                ok $ok, 'displayName has changed';
             }
-            ),
-            'upsertProfile';
-        #
-        {
-            my $todo = todo 'Bluesky might take a little time to commit changes';
-            my $ok   = 0;
-            for ( 1 .. 3 ) {
-                last if $ok = $original ne getProfileDisplayName();
-                diag 'giving Bluesky a moment to catch up...';
-                sleep 2;
-            }
-            ok $ok, 'displayName has changed';
         }
     };
     subtest 'pull timeline' => sub {
@@ -131,5 +136,7 @@ SKIP: {
         }, 'getRepostedBy( ... )';
     };
 }
+use Data::Dump;
+ddx $bsky;
 #
 done_testing;
