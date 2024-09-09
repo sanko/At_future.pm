@@ -47,15 +47,14 @@ package At 1.0 {
         }, $class;
     }
 
-    sub ratelimit ( $s, $type //= 'global', $meta //= () ) {
-
-        #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
-        defined $meta ? $s->{ratelimits}{$type}{$meta} : $s->{ratelimits}{$type};
+    sub ratelimit_ ( $s, $rate, $type, $meta //= () ) {    #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
+        defined $meta ? $s->{ratelimits}{$type}{$meta} = $rate : $s->{ratelimits}{$type} = $rate;
     }
 
-    sub _ratecheck( $rate, $type ) {
+    sub _ratecheck( $s, $type, $meta //= () ) {
+        my $rate = defined $meta ? $s->{ratelimits}{$type}{$meta} : $s->{ratelimits}{$type};
         $rate->{reset} // return;
-        return warnings::warnif( At => sprintf 'Over %s rate limit. Try again in %s', $type, _duration( $rate->{reset} - time ) )
+        return warnings::warnif( At => sprintf 'Exceeded %s rate limit. Try again in %s', $type, _duration( $rate->{reset} - time ) )
             if defined $rate->{reset} && $rate->{remaining} == 0 && $rate->{reset} > time;
         my $percent = _percent( $rate->{remaining}, $rate->{limit} );
         warnings::warnif(
@@ -74,22 +73,15 @@ package At 1.0 {
     }
     #
     sub createAccount ( $s, %args ) {
-        _ratecheck( $s->{ratelimits}{createAccount}, 'createAccount' );
         my $session = At::com::atproto::server::createAccount( $s, %args );
         $s->{http}->_set_session($session) if $session;
-        _ratecheck( $s->{ratelimits}{createAccount}, 'createAccount' );
         $session;
     }
 
     sub login ( $s, %args ) {
-        _ratecheck( $s->{ratelimits}{createSession}{ $args{identifier} }, 'createSession' );
         my ( $session, $headers ) = At::com::atproto::server::createSession( $s, %args );
         $session || return $session;
         $s->{http}->_set_session($session);
-
-        #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
-        $s->{ratelimits}{createSession}{ $args{identifier} }{$_} = $headers->{ 'ratelimit-' . $_ } for qw[limit remaining reset];
-        _ratecheck( $s->{ratelimits}{createSession}{ $args{identifier} }, 'createSession' );
         $session;
     }
 
@@ -246,13 +238,19 @@ package At 1.0 {
                     elsif ( $schema->{type} eq 'procedure' ) {
                         my @namespace = split /\./, $fqdn;
                         no strict 'refs';
+                        my $rate_category
+                            = $namespace[-1] =~ m[^(updateHandle|createAccount|createSession|deleteAccount|resetPassword)$] ? $namespace[-1] :
+                            'global';
                         *{ join '::', 'At', @namespace } = sub ( $s, %args ) {
-                            _ratecheck( $s->{ratelimits}{global}, 'global' );
+                            my $_rate_meta
+                                = $rate_category eq 'createSession' ? $args{identifier} : $rate_category eq 'updateHandle' ? $args{did} : ();
+                            $s->_ratecheck( $rate_category, $_rate_meta );
                             my ( $content, $headers ) = $s->{http}->post( $s->{service}->as_string . ( '/xrpc/' . $fqdn ), { content => \%args } );
 
                             #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
-                            $s->{ratelimits}{global}{$_} = $headers->{ 'ratelimit-' . $_ } for qw[limit remaining reset];
-                            _ratecheck( $s->{ratelimits}{global}, 'global' );
+                            $s->ratelimit_( { map { $_ => $headers->{ 'ratelimit-' . $_ } } qw[limit remaining reset] }, $rate_category,
+                                $_rate_meta );
+                            $s->_ratecheck( $rate_category, $_rate_meta );
                             $content = builtin::blessed $content? $content : _coerce( $fqdn, $schema->{output}{schema}, $content );
                             wantarray ? ( $content, $headers ) : $content;
                         };
@@ -262,14 +260,14 @@ package At 1.0 {
                         my @namespace = split /\./, $fqdn;
                         no strict 'refs';
                         *{ join '::', 'At', @namespace } = sub ( $s, %args ) {
-                            _ratecheck( $s->{ratelimits}{global}, 'global' );
+                            $s->_ratecheck('global');
 
                             # ddx $schema;
                             my ( $content, $headers ) = $s->{http}->get( $s->{service}->as_string . ( '/xrpc/' . $fqdn ), { content => \%args } );
 
                             #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
-                            $s->{ratelimits}{global}{$_} = $headers->{ 'ratelimit-' . $_ } for qw[limit remaining reset];
-                            _ratecheck( $s->{ratelimits}{global}, 'global' );
+                            $s->ratelimit_( { map { $_ => $headers->{ 'ratelimit-' . $_ } } qw[limit remaining reset] }, 'global' );
+                            $s->_ratecheck('global');
                             $content = builtin::blessed $content? $content : _coerce( $fqdn, $schema->{output}{schema}, $content );
                             wantarray ? ( $content, $headers ) : $content;
                         };
