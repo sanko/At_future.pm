@@ -16,7 +16,18 @@ package At 1.0 {
     #
     $|++;
     #
-    sub _percent( $to, $from ) { ( ( $to - $from ) / $from ) * 100 }
+    sub _percent ( $limit, $remaining ) { ( ( $limit / $remaining ) * 100 ) }
+    sub _plural( $count, $word )        { $count ? sprintf '%d %s%s', $count, $word, $count == 1 ? '' : 's' : () }
+
+    sub _duration ($seconds) {
+        $seconds || return '0 seconds';
+        $seconds = abs $seconds;                                                                        # just in case
+        my ( $time, @times ) = reverse grep {defined} _plural( int( $seconds / 31536000 ), 'year' ),    # assume 365 days and no leap seconds
+            _plural( int( ( $seconds % 31536000 ) / 604800 ), 'week' ), _plural( int( ( $seconds % 604800 ) / 86400 ), 'day' ),
+            _plural( int( ( $seconds % 86400 ) / 3600 ),      'hour' ), _plural( int( ( $seconds % 3600 ) / 60 ),      'minute' ),
+            _plural( $seconds % 60,                           'second' );
+        join ' and ', @times ? join( ', ', reverse @times ) : (), $time;
+    }
     #
     sub new ( $class, %args ) {
         $args{service} // Carp::croak 'At requires a service';
@@ -60,12 +71,27 @@ package At 1.0 {
     }
 
     sub login ( $s, %args ) {
+        warnings::warnif(
+            At => sprintf 'Over rate limit. Try again in %s',
+            _duration( $s->{ratelimits}{createSession}{ $args{identifier} }{reset} - time )
+            )
+            if defined $s->{ratelimits}{createSession}{ $args{identifier} }{reset} &&
+            $s->{ratelimits}{createSession}{ $args{identifier} }{remaining} &&
+            $s->{ratelimits}{createSession}{ $args{identifier} }{reset} > time;
         my ( $session, $headers ) = At::com::atproto::server::createSession( $s, %args );
         $session || return $session;
         $s->{http}->_set_session($session);
 
         #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
         $s->{ratelimits}{createSession}{ $args{identifier} }{$_} = $headers->{ 'ratelimit-' . $_ } for qw[limit remaining reset];
+        my $percent = _percent( $s->{ratelimits}{createSession}{ $args{identifier} }{remaining},
+            $s->{ratelimits}{createSession}{ $args{identifier} }{limit} );
+        warnings::warnif(
+            At => sprintf 'Used %.2f of rate limit (%d of %d). Try again in %s',
+            100 - $percent, $s->{ratelimits}{createSession}{ $args{identifier} }{remaining},
+            $s->{ratelimits}{createSession}{ $args{identifier} }{limit},
+            _duration( $s->{ratelimits}{createSession}{ $args{identifier} }{reset} - time )
+        ) if $percent <= 5;
         $session;
     }
 
