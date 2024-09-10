@@ -135,8 +135,23 @@ SKIP: {
             end;
         }, 'getRepostedBy( ... )';
     };
+    my $post;
+    subtest 'post plain text content' => sub {
+        $login || skip_all "$login";
+        is $post = $bsky->post( text => 'Testing' ), hash {    # com.atproto.repo.createRecord#output
+            field cid => D();                                  # CID
+            field uri => D();                                  # AT-uri
+            etc;                                               # might also contain commit and validationStatus
+        }, 'post( ... )';
+    };
+    subtest 'delete the post we just created' => sub {
+        $login || skip_all "$login";
+        $post  || skip_all "$post";
+        is my $delete = $bsky->deletePost( $post->{uri} ), hash {
+            field commit => D();                               # com.atproto.repo.defs#commitMeta; Not required but...
+            end;
+        }, 'deletePost(...)';
+    };
 }
-use Data::Dump;
-ddx $bsky;
 #
 done_testing;

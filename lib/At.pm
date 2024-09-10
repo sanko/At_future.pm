@@ -36,7 +36,7 @@ package At 1.0 {
         bless {
             http       => $args{http},
             service    => $args{service},
-            ratelimits => {                 #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
+            ratelimits => {                 # https://docs.bsky.app/docs/advanced-guides/rate-limits
                 global        => {},
                 updateHandle  => {},    # per DID
                 updateHandle  => {},    # per DID
@@ -113,9 +113,20 @@ package At 1.0 {
         At::app::bsky::feed::getRepostedBy( $s, %args );
     }
 
-    #~ await agent.getRepostedBy(params, opts)
-    #~ await agent.post(record)
-    #~ await agent.deletePost(postUri)
+    sub post ( $s, %args ) {
+        At::com::atproto::repo::createRecord(
+            $s,
+            repo       => $s->did,
+            collection => 'app.bsky.feed.post',
+            record     => { '$type' => 'app.bsky.feed.post', createdAt => Time::Moment->now->to_string, %args }
+        );
+    }
+
+    sub deletePost ( $s, $at_uri ) {
+        $at_uri = At::URI->new($at_uri) unless builtin::blessed $at_uri;
+        At::com::atproto::repo::deleteRecord( $s, repo => $s->did, collection => 'app.bsky.feed.post', rkey => $at_uri->rkey );
+    }
+
     #~ await agent.like(uri, cid)
     #~ await agent.deleteLike(likeUri)
     #~ await agent.repost(uri, cid)
