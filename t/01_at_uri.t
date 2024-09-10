@@ -1,9 +1,5 @@
 use Test2::V0;
 use v5.36;
-
-# Dev
-# https://github.com/bluesky-social/atproto/blob/main/packages/api/tests/bsky-agent.test.ts
-use Data::Dump;
 use lib '../eg/', 'eg', '../lib', 'lib';
 #
 use if -d '../share',  At => -lexicons => '../share';
@@ -31,10 +27,11 @@ subtest 'At::URI::_query' => sub {
     ok $query->delete_param('foo'), q[delete_param('foo')];
     is $query->as_string, 'bar=xyzzy', '->as_string';
 };
+
+# Taken from https://github.com/bluesky-social/atproto/blob/main/packages/syntax/tests/aturi.test.ts
 subtest 'parses valid at uris' => sub {
     my @uris = (
 
-        # Taken from https://github.com/bluesky-social/atproto/blob/main/packages/syntax/tests/aturi.test.ts
         # [ input, host, path, query, hash]
         [ 'foo.com',                                                    'foo.com', '',         '',                 '' ],
         [ 'at://foo.com',                                               'foo.com', '',         '',                 '' ],
