@@ -3,7 +3,7 @@ package At 1.0 {
     use warnings::register;
     use experimental qw[try for_list];
     use diagnostics;
-    no warnings qw[experimental::builtin];
+    no warnings qw[experimental::builtin experimental::try];
     use parent               qw[Exporter];
     use Carp                 qw[carp confess];
     use File::ShareDir::Tiny qw[dist_dir module_dir];
@@ -438,21 +438,110 @@ package                           #
     use v5.38;
     use Carp qw[carp confess];
     use URI;
-    no warnings qw[experimental::builtin];
+    use feature 'try';
+    no warnings qw[experimental::builtin experimental::try];
     use overload
         '""' => sub ( $s, $u, $q ) {
         $$s;
         };
 
+    #~ Currently these are registration-time restrictions, not protocol-level
+    #~ restrictions. We have a couple accounts in the wild that we need to clean up
+    #~ before hard-disallow.
+    #~ See also: https://en.wikipedia.org/wiki/Top-level_domain#Reserved_domains
+    my @DISALLOWED_TLDS = (
+        '.local', '.arpa', '.invalid', '.localhost', '.internal', '.example', '.alt',
+
+        # policy could concievably change on ".onion" some day
+        '.onion',
+
+        #~ NOTE: .test is allowed in testing and devopment. In practical terms
+        #~ "should" "never" actually resolve and get registered in production
+    );
+
     sub new( $class, $id ) {
-        confess 'malformed handle: ' . $id unless $id =~ /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
-        confess 'disallowed TLD in handle: ' . $id if $id =~ /\.(arpa|example|internal|invalid|local|localhost|onion)$/;
+        confess 'invalid TLD' unless isValidTld($id);
+        ensureValidHandle($id);
+        ensureValidHandleRegex($id);
         CORE::state $warned //= 0;
         if ( $id =~ /\.(test)$/ && !$warned ) {
             carp 'development or testing TLD used in handle: ' . $id;
             $warned = 1;
         }
         bless \$id, $class;
+    }
+
+    # Taken from https://github.com/bluesky-social/atproto/blob/main/packages/syntax/src/handle.ts
+    # Handle constraints, in English:
+    #  - must be a possible domain name
+    #    - RFC-1035 is commonly referenced, but has been updated. eg, RFC-3696,
+    #      section 2. and RFC-3986, section 3. can now have leading numbers (eg,
+    #      4chan.org)
+    #    - "labels" (sub-names) are made of ASCII letters, digits, hyphens
+    #    - can not start or end with a hyphen
+    #    - TLD (last component) should not start with a digit
+    #    - can't end with a hyphen (can end with digit)
+    #    - each segment must be between 1 and 63 characters (not including any periods)
+    #    - overall length can't be more than 253 characters
+    #    - separated by (ASCII) periods; does not start or end with period
+    #    - case insensitive
+    #    - domains (handles) are equal if they are the same lower-case
+    #    - punycode allowed for internationalization
+    #  - no whitespace, null bytes, joining chars, etc
+    #  - does not validate whether domain or TLD exists, or is a reserved or
+    #    special TLD (eg, .onion or .local)
+    #  - does not validate punycode
+    sub ensureValidHandle ($handle) {
+
+        # check that all chars are boring ASCII
+        confess 'Disallowed characters in handle (ASCII letters, digits, dashes, periods only)' if $handle !~ /^[a-zA-Z0-9.-]*$/;
+        #
+        confess 'Handle is too long (253 chars max)' if length $handle > 253;
+        #
+        my @labels = split /\./, $handle, -1;    # negative limit, ftw
+        confess 'Handle domain needs at least two parts' if scalar @labels < 2;
+        for my $i ( 0 .. $#labels ) {
+            my $l = $labels[$i];
+            confess 'Handle parts can not be empty'                             if !length $l;
+            confess 'Handle part too long (max 63 chars)'                       if length $l > 63;
+            confess 'Handle parts can not start or end with hyphens'            if $l                   =~ /^-|-$/;
+            confess 'Handle final component (TLD) must start with ASCII letter' if $i == $#labels && $l !~ /^[a-zA-Z]/;
+        }
+        1;
+    }
+
+    sub ensureValidHandleRegex ($handle) {
+        confess q[Handle didn't validate via regex]
+            unless $handle =~ /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
+        confess 'Handle is too long (253 chars max)' if length $handle > 253;
+        1;
+    }
+
+    sub normalizeHandle ($handle) {
+        lc $handle;
+    }
+
+    sub normalizeAndEnsureValidHandle($handle) {
+        my $normalized = normalizeHandle($handle);
+        ensureValidHandle($normalized);
+        $normalized;
+    }
+
+    sub isValidHandle ($handle) {
+        try {
+            ensureValidHandle($handle)
+        }
+        catch ($err) {    # TODO: I should be throwing actual objects but this is perl...
+            return 0;
+        }
+        1;
+    }
+
+    sub isValidTld($handle) {
+        for my $tld (@DISALLOWED_TLDS) {
+            return 0 if $handle =~ /${tld}$/;
+        }
+        1;
     }
     };
 package                        #
@@ -493,7 +582,7 @@ package                        #
         # check that all chars are boring ASCII
         confess 'Disallowed characters in DID (ASCII letters, digits, and a couple other characters only)' unless $did =~ /^[a-zA-Z0-9._:%-]*$/;
         #
-        my @parts = split ':', $did;
+        my @parts = split ':', $did, -1;    # negative limit, ftw
         confess 'DID requires prefix, method, and method-specific content' if @parts < 3;
         #
         confess 'DID requires "did:" prefix' if $parts[0] ne 'did';

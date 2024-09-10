@@ -1,4 +1,4 @@
-requires 'perl', '5.038';
+requires 'perl', '5.036';
 requires 'File::ShareDir::Tiny';
 requires 'JSON::Tiny';
 requires 'Path::Tiny';
