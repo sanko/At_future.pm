@@ -332,8 +332,8 @@ package At 1.0 {
             $data // return ();
             if ( defined $schema->{format} ) {
                 if    ( $schema->{format} eq 'uri' )    { return URI->new($data); }
-                elsif ( $schema->{format} eq 'at-uri' ) { return $data; }             # TODO
-                elsif ( $schema->{format} eq 'cid' )    { return $data; }             # TODO
+                elsif ( $schema->{format} eq 'at-uri' ) { return At::URI->new($data); }
+                elsif ( $schema->{format} eq 'cid' )    { return $data; }                 # TODO
                 elsif ( $schema->{format} eq 'datetime' ) {
                     return $data =~ /\D/ ? Time::Moment->from_string($data) : Time::Moment->from_epoch($data);
                 }
@@ -367,6 +367,139 @@ package At 1.0 {
         $data // return ();
         return $coercions{ $schema->{type} }->( $namespace, $schema, $data ) if defined $coercions{ $schema->{type} };
         die 'Unknown coercion: ' . $schema->{type};
+    }
+}
+package    #
+    At::URI::_query 1.0 {
+    use v5.38;
+    use URI::Escape qw[uri_escape_utf8 uri_unescape];
+    use overload
+        '""' => sub ( $s, $u, $q ) {
+        $s->as_string;
+        };
+
+    sub new( $class, $qs ) {
+        my $s = bless [], $class;
+        $s->parse_params($qs);
+        $s;
+    }
+
+    sub parse_params( $s, $qs ) {
+        $qs =~ s[^\?+][];    # Just in case
+        @$s = map {
+            [ map { uri_unescape($_) } split /=/, $_, 2 ]
+        } split /[&;]/, $qs;
+    }
+
+    sub get_param( $s, $name ) {
+        map { $_->[1] } grep { $_->[0] eq $name } @$s;
+    }
+
+    sub add_param( $s, $name, @v ) {
+        $name = uri_unescape $name;
+        push @$s, [ $name, uri_unescape shift @v ] while @v;
+        1;
+    }
+
+    sub set_param( $s, $name, @v ) {
+        $name = uri_unescape $name;
+        for my $slot ( grep { $_->[0] eq $name } @$s ) {
+            $slot->[1] = uri_unescape shift @v;
+            @v || last;
+        }
+        push @$s, [ $name, uri_unescape shift @v ] while @v;
+        1;
+    }
+
+    sub delete_param( $s, $name ) {
+        $name = uri_unescape $name;
+        @$s   = grep { $_->[0] ne $name } @$s;
+    }
+
+    sub replace_param( $s, $name, @v ) {
+        $s->delete_param($name);
+        $name = uri_unescape $name;
+        push @$s, [ $name, uri_unescape shift @v ] while @v;
+        1;
+    }
+
+    sub reset($s) {
+        !( @$s = () );
+    }
+
+    sub as_string( $s, $sep //= '&' ) {
+        join $sep, map { join '=', uri_escape_utf8( $_->[0] ), uri_escape_utf8( $_->[1] ) } @$s;
+    }
+}
+package              #
+    At::URI 1.0 {    # https://atproto.com/specs/at-uri-scheme
+    use v5.38;
+    use URI::_query;
+
+    #~ use builtin qw[blessed];
+    no warnings qw[experimental::builtin];
+    use overload
+        '""' => sub ( $s, $u, $q ) {
+        $s->as_string;
+        };
+
+    sub ATP_URI_REGEX () {
+
+        #   proto-    --did--------------   --name----------------   --path----   --query--   --hash--
+        qr/^(at:\/\/)?((?:did:[a-z0-9:%-]+)|(?:[a-z0-9][a-z0-9.:-]*))(\/[^?#\s]*)?(\?[^#\s]+)?(#[^\s]+)?$/i;
+    }
+
+    sub RELATIVE_REGEX () {
+
+        #   --path-----   --query--  --hash--
+        qr/^(\/[^?#\s]*)?(\?[^#\s]+)?(#[^\s]+)?$/i;
+    }
+
+    sub new( $class, $uri ) {
+        $uri = URI->new($uri) unless builtin::blessed $uri;
+        use Data::Dump;
+        my @res = $uri->as_string =~ ATP_URI_REGEX();
+        bless { hash => $res[4] // '', host => $res[1] // '', pathname => $res[2] // '', searchParams => At::URI::_query->new( $res[3] // '' ) },
+            $class;
+    }
+
+    sub as_string($s) {
+        my $path = $s->pathname // '';
+        $path = '/' . $path if $path !~ m[^/];
+        my $qs = $s->search;
+        $qs = '?' . $qs if length $qs && $qs !~ m[^\?];
+        my $hash = $s->hash;
+        $hash = '#' . $hash if length $hash && $hash !~ m[^#];
+        join '', grep {defined} $s->origin, $path, $qs, $hash;
+    }
+
+    sub make ( $handle_r_did, $collection //= (), $rkey //= () ) {
+        At->new( join '/', grep {defined} $handle_r_did, $collection, $rkey );
+    }
+    sub protocol ($s)             {'at:'}
+    sub origin($s)                { $s->protocol . '//' . $s->host }
+    sub host ( $s, $v //= () )    { $v // return $s->{host}; $s->{host} = $v }
+    sub pathname( $s, $v //= () ) { $v // return $s->{pathname}; $s->{pathname} = $v }
+
+    sub search ( $s, $v //= () ) {
+        $v // return $s->{searchParams};
+        $s->{searchParams}->parse_params($v);
+    }
+    sub hash ( $s, $v //= () ) { $v // return $s->{hash}; $s->{hash} = $v; }
+
+    sub collection ( $s, $v //= () ) {
+        return [ grep {length} split '/', $s->pathname ]->[0] || '' unless defined $v;
+        my @parts = split '/', $s->pathname;
+        $parts[0] = $v;
+        $s->pathname( join '/', @parts );
+    }
+
+    sub rkey ( $s, $v //= () ) {
+        return [ grep {length} split '/', $s->pathname ]->[1] || '' unless defined $v;
+        my @parts = split '/', $s->pathname;
+        $parts[0] //= 'undefined';
+        $parts[1] = $v;
+        $s->pathname( join '/', @parts );
     }
 }
 package    #
