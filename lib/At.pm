@@ -123,12 +123,12 @@ package At 1.0 {
     }
 
     sub deletePost ( $s, $at_uri ) {
-        $at_uri = At::URI->new($at_uri) unless builtin::blessed $at_uri;
+        $at_uri = At::Protocol::URI->new($at_uri) unless builtin::blessed $at_uri;
         At::com::atproto::repo::deleteRecord( $s, repo => $s->did, collection => 'app.bsky.feed.post', rkey => $at_uri->rkey );
     }
 
     sub like ( $s, $at_uri, $cid ) {
-        $at_uri = At::URI->new($at_uri) unless builtin::blessed $at_uri;
+        $at_uri = At::Protocol::URI->new($at_uri) unless builtin::blessed $at_uri;
         At::com::atproto::repo::createRecord(
             $s,
             repo       => $s->did,
@@ -145,12 +145,12 @@ package At 1.0 {
     }
 
     sub deleteLike ( $s, $at_uri ) {
-        $at_uri = At::URI->new($at_uri) unless builtin::blessed $at_uri;
+        $at_uri = At::Protocol::URI->new($at_uri) unless builtin::blessed $at_uri;
         At::com::atproto::repo::deleteRecord( $s, repo => $s->did, collection => 'app.bsky.feed.like', rkey => $at_uri->rkey );
     }
 
     sub repost ( $s, $at_uri, $cid ) {
-        $at_uri = At::URI->new($at_uri) unless builtin::blessed $at_uri;
+        $at_uri = At::Protocol::URI->new($at_uri) unless builtin::blessed $at_uri;
         At::com::atproto::repo::createRecord(
             $s,
             repo       => $s->did,
@@ -167,7 +167,7 @@ package At 1.0 {
     }
 
     sub deleteRepost ( $s, $at_uri ) {
-        $at_uri = At::URI->new($at_uri) unless builtin::blessed $at_uri;
+        $at_uri = At::Protocol::URI->new($at_uri) unless builtin::blessed $at_uri;
         At::com::atproto::repo::deleteRecord( $s, repo => $s->did, collection => 'app.bsky.feed.repost', rkey => $at_uri->rkey );
     }
 
@@ -408,28 +408,16 @@ package At 1.0 {
             $data // return ();
             if ( defined $schema->{format} ) {
                 if    ( $schema->{format} eq 'uri' )    { return URI->new($data); }
-                elsif ( $schema->{format} eq 'at-uri' ) { return At::URI->new($data); }
-                elsif ( $schema->{format} eq 'cid' )    { return $data; }                 # TODO
+                elsif ( $schema->{format} eq 'at-uri' ) { return At::Protocol::URI->new($data); }
+                elsif ( $schema->{format} eq 'cid' )    { return $data; }                           # TODO
                 elsif ( $schema->{format} eq 'datetime' ) {
                     return $data =~ /\D/ ? Time::Moment->from_string($data) : Time::Moment->from_epoch($data);
                 }
                 elsif ( $schema->{format} eq 'did' ) {
-                    confess 'malformed DID URI: ' . $data unless $data =~ /^did:([a-z]+:[a-zA-Z0-9._:%-]*[a-zA-Z0-9._-])$/;
-                    $data = URI->new($data) unless builtin::blessed $data;
-                    my $scheme = $data->scheme;
-                    carp 'unsupported method: ' . $scheme unless $scheme =~ m/^(did|plc|web)$/;
-                    return $data;
+                    return At::Protocol::DID->new($data);
                 }
                 elsif ( $schema->{format} eq 'handle' ) {
-                    confess 'malformed handle: ' . $data
-                        unless $data =~ /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
-                    confess 'disallowed TLD in handle: ' . $data if $data =~ /\.(arpa|example|internal|invalid|local|localhost|onion)$/;
-                    CORE::state $warned //= 0;
-                    if ( $data =~ /\.(test)$/ && !$warned ) {
-                        carp 'development or testing TLD used in handle: ' . $data;
-                        $warned = 1;
-                    }
-                    return $data;
+                    return At::Protocol::Handle->new($data);
                 }
                 warn $data;
                 ddx $schema;
@@ -445,8 +433,49 @@ package At 1.0 {
         die 'Unknown coercion: ' . $schema->{type};
     }
 }
+package                           #
+    At::Protocol::Handle 1.0 {    # https://atproto.com/specs/handle
+    use v5.38;
+    use Carp qw[carp confess];
+    use URI;
+    no warnings qw[experimental::builtin];
+    use overload
+        '""' => sub ( $s, $u, $q ) {
+        $$s;
+        };
+
+    sub new( $class, $id ) {
+        confess 'malformed handle: ' . $id unless $id =~ /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
+        confess 'disallowed TLD in handle: ' . $id if $id =~ /\.(arpa|example|internal|invalid|local|localhost|onion)$/;
+        CORE::state $warned //= 0;
+        if ( $id =~ /\.(test)$/ && !$warned ) {
+            carp 'development or testing TLD used in handle: ' . $id;
+            $warned = 1;
+        }
+        bless \$id, $class;
+    }
+    };
+package                        #
+    At::Protocol::DID 1.0 {    # https://atproto.com/specs/did
+    use v5.38;
+    use Carp qw[carp confess];
+    use URI;
+    no warnings qw[experimental::builtin];
+    use overload
+        '""' => sub ( $s, $u, $q ) {
+        'did:' . $$s;
+        };
+
+    sub new( $class, $uri ) {
+        confess 'malformed DID URI: ' . $uri unless $uri =~ /^did:([a-z]+:[a-zA-Z0-9._:%-]*[a-zA-Z0-9._-])$/;
+        $uri = URI->new($1) unless builtin::blessed $uri;
+        my $scheme = $uri->scheme;
+        carp 'unsupported method: ' . $scheme unless $scheme =~ m/^(did|plc|web)$/;
+        bless \$uri, $class;
+    }
+    };
 package    #
-    At::URI::_query 1.0 {
+    At::Protocol::URI::_query 1.0 {
     use v5.38;
     use URI::Escape qw[uri_escape_utf8 uri_unescape];
     use overload
@@ -507,12 +536,9 @@ package    #
         join $sep, map { join '=', uri_escape_utf8( $_->[0] ), uri_escape_utf8( $_->[1] ) } @$s;
     }
 }
-package              #
-    At::URI 1.0 {    # https://atproto.com/specs/at-uri-scheme
+package                        #
+    At::Protocol::URI 1.0 {    # https://atproto.com/specs/at-uri-scheme
     use v5.38;
-    use URI::_query;
-
-    #~ use builtin qw[blessed];
     no warnings qw[experimental::builtin];
     use overload
         '""' => sub ( $s, $u, $q ) {
@@ -535,8 +561,12 @@ package              #
         $uri = URI->new($uri) unless builtin::blessed $uri;
         use Data::Dump;
         my @res = $uri->as_string =~ ATP_URI_REGEX();
-        bless { hash => $res[4] // '', host => $res[1] // '', pathname => $res[2] // '', searchParams => At::URI::_query->new( $res[3] // '' ) },
-            $class;
+        bless {
+            hash         => $res[4] // '',
+            host         => $res[1] // '',
+            pathname     => $res[2] // '',
+            searchParams => At::Protocol::URI::_query->new( $res[3] // '' )
+        }, $class;
     }
 
     sub as_string($s) {

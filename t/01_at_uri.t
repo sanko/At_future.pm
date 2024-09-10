@@ -5,8 +5,8 @@ use lib '../eg/', 'eg', '../lib', 'lib';
 use if -d '../share',  At => -lexicons => '../share';
 use if !-d '../share', At => ();
 #
-subtest 'At::URI::_query' => sub {
-    isa_ok my $query = At::URI::_query->new('?foo=bar&foo=baz'), ['At::URI::_query'], '?foo=bar&foo=baz';
+subtest 'At::Protocol::URI::_query' => sub {
+    isa_ok my $query = At::Protocol::URI::_query->new('?foo=bar&foo=baz'), ['At::Protocol::URI::_query'], '?foo=bar&foo=baz';
     is $query->as_string, 'foo=bar&foo=baz', '->as_string';
     ok $query->add_param( foo => 'qux' ), q[add_param(foo => 'qux')];
     is $query->as_string, 'foo=bar&foo=baz&foo=qux', '->as_string';
@@ -131,7 +131,7 @@ subtest 'parses valid at uris' => sub {
     #
     for my $uri (@uris) {
         subtest $uri->[0] => sub {
-            isa_ok my $urip = At::URI->new( $uri->[0] ), ['At::URI'], 'At::URI->new(...)';
+            isa_ok my $urip = At::Protocol::URI->new( $uri->[0] ), ['At::Protocol::URI'], 'At::Protocol::URI->new(...)';
             is $urip->protocol,     'at:',               '->protocol';
             is $urip->host,         $uri->[1],           '->host';
             is $urip->origin,       'at://' . $uri->[1], '->origin';
@@ -143,23 +143,23 @@ subtest 'parses valid at uris' => sub {
 };
 subtest 'handles ATP-specific parsing' => sub {
     subtest 'at://foo.com' => sub {
-        isa_ok my $urip = At::URI->new('at://foo.com'), ['At::URI'], 'At::URI->new(...)';
+        isa_ok my $urip = At::Protocol::URI->new('at://foo.com'), ['At::Protocol::URI'], 'At::Protocol::URI->new(...)';
         is $urip->collection, '', '->collection';
         is $urip->rkey,       '', '->rkey';
     };
     subtest 'at://foo.com/com.example.foo' => sub {
-        isa_ok my $urip = At::URI->new('at://foo.com/com.example.foo'), ['At::URI'], 'At::URI->new(...)';
+        isa_ok my $urip = At::Protocol::URI->new('at://foo.com/com.example.foo'), ['At::Protocol::URI'], 'At::Protocol::URI->new(...)';
         is $urip->collection, 'com.example.foo', '->collection';
         is $urip->rkey,       '',                '->rkey';
     };
     subtest 'at://foo.com/com.example.foo/123' => sub {
-        isa_ok my $urip = At::URI->new('at://foo.com/com.example.foo/123'), ['At::URI'], 'At::URI->new(...)';
+        isa_ok my $urip = At::Protocol::URI->new('at://foo.com/com.example.foo/123'), ['At::Protocol::URI'], 'At::Protocol::URI->new(...)';
         is $urip->collection, 'com.example.foo', '->collection';
         is $urip->rkey,       '123',             '->rkey';
     };
 };
 subtest 'supports modifications' => sub {
-    isa_ok my $urip = At::URI->new('at://foo.com'), ['At::URI'], 'At::URI->new(...)';
+    isa_ok my $urip = At::Protocol::URI->new('at://foo.com'), ['At::Protocol::URI'], 'At::Protocol::URI->new(...)';
     is $urip, 'at://foo.com/', 'foo.com';
     #
     subtest 'host' => sub {
