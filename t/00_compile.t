@@ -135,23 +135,83 @@ SKIP: {
             end;
         }, 'getRepostedBy( ... )';
     };
-    my $post;
-    subtest 'post plain text content' => sub {
-        $login || skip_all "$login";
-        is $post = $bsky->post( text => 'Testing' ), hash {    # com.atproto.repo.createRecord#output
-            field cid => D();                                  # CID
-            field uri => D();                                  # AT-uri
-            etc;                                               # might also contain commit and validationStatus
-        }, 'post( ... )';
-    };
-    subtest 'delete the post we just created' => sub {
-        $login || skip_all "$login";
-        $post  || skip_all "$post";
-        is my $delete = $bsky->deletePost( $post->{uri} ), hash {
-            field commit => D();                               # com.atproto.repo.defs#commitMeta; Not required but...
-            end;
-        }, 'deletePost(...)';
-    };
+    {
+        my $post;
+        subtest 'post plain text content' => sub {
+            $login || skip_all "$login";
+            is $post = $bsky->post( text => 'Testing' ), hash {    # com.atproto.repo.createRecord#output
+                field cid => D();                                  # CID
+                field uri => D();                                  # AT-uri
+                etc;                                               # might also contain commit and validationStatus
+            }, 'post( ... )';
+        };
+        {
+            my $like;
+            subtest 'like the post we just created' => sub {
+                $login || skip_all "$login";
+                $post  || skip_all "$post";
+                is $like = $bsky->like( $post->{uri}, $post->{cid} ), hash {
+
+                    # com.atproto.repo.createRecord#output
+                    field cid => D();    # CID
+                    field uri => D();    # AT-uri
+                    etc;                 # might also contain commit and validationStatus
+                }, 'like(...)';
+            };
+            subtest 'delete like we just created' => sub {
+                $login || skip_all "$login";
+                $post  || skip_all "$post";
+                $like  || skip_all "$like";
+                is $bsky->deleteLike( $like->{uri} ), hash {
+                    field commit => hash {
+                        field cid => D();    # CID
+                        field rev => D();
+                        end;
+                    };
+                    etc;
+                }, 'deleteLike(...)';
+            };
+        }
+        {
+            my $repost;
+            subtest 'repost the post we just created' => sub {
+                $login || skip_all "$login";
+                $post  || skip_all "$post";
+                is $repost = $bsky->repost( $post->{uri}, $post->{cid} ), hash {
+
+                    # com.atproto.repo.createRecord#output
+                    field cid => D();    # CID
+                    field uri => D();    # AT-uri
+                    etc;                 # might also contain commit and validationStatus
+                }, 'repost(...)';
+            };
+            subtest 'delete repost we just created' => sub {
+                $login  || skip_all "$login";
+                $post   || skip_all "$post";
+                $repost || skip_all "$repost";
+                is $bsky->deleteRepost( $repost->{uri} ), hash {
+                    field commit => hash {
+                        field cid => D();    # CID
+                        field rev => D();
+                        end;
+                    };
+                    etc;
+                }, 'deleteRepost(...)';
+            };
+        }
+        subtest 'delete the post we created earlier' => sub {
+            $login || skip_all "$login";
+            $post  || skip_all "$post";
+            is my $delete = $bsky->deletePost( $post->{uri} ), hash {
+                field commit => hash {
+                    field cid => D();    # CID
+                    field rev => D();
+                    end;
+                };
+                etc;
+            }, 'deletePost(...)';
+        };
+    }
 }
 #
 done_testing;

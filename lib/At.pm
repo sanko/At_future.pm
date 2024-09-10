@@ -127,11 +127,57 @@ package At 1.0 {
         At::com::atproto::repo::deleteRecord( $s, repo => $s->did, collection => 'app.bsky.feed.post', rkey => $at_uri->rkey );
     }
 
-    #~ await agent.like(uri, cid)
-    #~ await agent.deleteLike(likeUri)
-    #~ await agent.repost(uri, cid)
-    #~ await agent.deleteRepost(repostUri)
+    sub like ( $s, $at_uri, $cid ) {
+        $at_uri = At::URI->new($at_uri) unless builtin::blessed $at_uri;
+        At::com::atproto::repo::createRecord(
+            $s,
+            repo       => $s->did,
+            collection => 'app.bsky.feed.like',
+            record     => {
+                '$type' => 'app.bsky.feed.like',
+                subject => {                       # com.atproto.repo.strongRef
+                    uri => $at_uri,
+                    cid => $cid
+                },
+                createdAt => Time::Moment->now->to_string
+            }
+        );
+    }
+
+    sub deleteLike ( $s, $at_uri ) {
+        $at_uri = At::URI->new($at_uri) unless builtin::blessed $at_uri;
+        At::com::atproto::repo::deleteRecord( $s, repo => $s->did, collection => 'app.bsky.feed.like', rkey => $at_uri->rkey );
+    }
+
+    sub repost ( $s, $at_uri, $cid ) {
+        $at_uri = At::URI->new($at_uri) unless builtin::blessed $at_uri;
+        At::com::atproto::repo::createRecord(
+            $s,
+            repo       => $s->did,
+            collection => 'app.bsky.feed.repost',
+            record     => {
+                '$type' => 'app.bsky.feed.repost',
+                subject => {                         # com.atproto.repo.strongRef
+                    uri => $at_uri,
+                    cid => $cid
+                },
+                createdAt => Time::Moment->now->to_string
+            }
+        );
+    }
+
+    sub deleteRepost ( $s, $at_uri ) {
+        $at_uri = At::URI->new($at_uri) unless builtin::blessed $at_uri;
+        At::com::atproto::repo::deleteRecord( $s, repo => $s->did, collection => 'app.bsky.feed.repost', rkey => $at_uri->rkey );
+    }
+
     #~ await agent.uploadBlob(data, opts)
+    #~ // Social graph
+    #~ await agent.getFollows(params, opts)
+    #~ await agent.getFollowers(params, opts)
+    #~ await agent.follow(did)
+    #~ await agent.deleteFollow(followUri)
+    # // Actors
     # Jumping ahead for a sec
     sub getProfile ( $s, %args ) {
         At::app::bsky::actor::getProfile( $s, %args );
@@ -155,6 +201,25 @@ package At 1.0 {
         }
         ();
     }
+
+    #~ await agent.upsertProfile(updateFn)
+    #~ await agent.getProfiles(params, opts)
+    #~ await agent.getSuggestions(params, opts)
+    #~ await agent.searchActors(params, opts)
+    #~ await agent.searchActorsTypeahead(params, opts)
+    #~ await agent.mute(did)
+    #~ await agent.unmute(did)
+    #~ await agent.muteModList(listUri)
+    #~ await agent.unmuteModList(listUri)
+    #~ await agent.blockModList(listUri)
+    #~ await agent.unblockModList(listUri)
+    #~ // Notifications
+    #~ await agent.listNotifications(params, opts)
+    #~ await agent.countUnreadNotifications(params, opts)
+    #~ await agent.updateSeenNotifications()
+    #~ // Identity
+    #~ await agent.resolveHandle(params, opts)
+    #~ await agent.updateHandle(params, opts)
     #
     {
         our %capture;
