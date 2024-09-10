@@ -552,7 +552,7 @@ package                        #
     no warnings qw[experimental::builtin];
     use overload
         '""' => sub ( $s, $u, $q ) {
-        'did:' . $$s;
+        $s->as_string;
         };
 
     sub new( $class, $uri ) {
@@ -561,6 +561,10 @@ package                        #
         my $scheme = $uri->scheme;
         carp 'unsupported method: ' . $scheme unless $scheme =~ m/^(did|plc|web)$/;
         bless \$uri, $class;
+    }
+
+    sub as_string($s) {
+        'did:' . $$s;
     }
 
     #~ Taken from https://github.com/bluesky-social/atproto/blob/main/packages/syntax/src/did.ts

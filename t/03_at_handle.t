@@ -212,7 +212,11 @@ subtest 'AT Handle validation' => sub {
         my $path = path(__FILE__)->sibling('interop-test-files')->child(qw[syntax handle_syntax_valid.txt])->realpath;
         $path // skip_all 'failed to locate valid test data';
         for my $line ( grep {length} $path->lines( { chomp => 1 } ) ) {
-            if ( $line =~ /^#\s*/ ) { diag $'; next; }
+            if ( $line =~ /^#\s*/ ) {
+
+                #~ diag $';
+                next;
+            }
             expectValid($line);
         }
     };
