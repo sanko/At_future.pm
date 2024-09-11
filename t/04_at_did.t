@@ -77,7 +77,9 @@ subtest 'conforms to interop valid DIDs' => sub {
     my $path = path(__FILE__)->sibling('interop-test-files')->child(qw[syntax did_syntax_valid.txt])->realpath;
     $path // skip_all 'failed to locate valid test data';
     for my $line ( grep {length} $path->lines( { chomp => 1 } ) ) {
-        if ( $line =~ /^#\s*/ ) { diag $'; next; }
+        if ( $line =~ /^#\s*/ ) {
+            #~ diag $';
+            next; }
         expectValid($line);
     }
 };
@@ -85,7 +87,9 @@ subtest 'conforms to interop invalid DIDs' => sub {
     my $path = path(__FILE__)->sibling('interop-test-files')->child(qw[syntax did_syntax_invalid.txt])->realpath;
     $path // skip_all 'failed to locate invalid test data';
     for my $line ( grep {length} $path->lines( { chomp => 1 } ) ) {
-        if ( $line =~ /^#\s*/ ) { diag $'; next; }
+        if ( $line =~ /^#\s*/ ) {
+            #~ diag $';
+            next; }
         expectInvalid($line);
     }
 };

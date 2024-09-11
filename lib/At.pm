@@ -225,11 +225,13 @@ package At 1.0 {
             my %updated = $fn->( %{ $existing->{value} } );
             my $okay    = At::com::atproto::repo::putRecord(
                 $s,
-                repo       => $repo->as_string,
-                collection => 'app.bsky.actor.profile',
-                rkey       => 'self',
-                record     => { %updated, type => 'app.bsky.actor.profile' },
-                swapRecord => $existing ? $existing->{cid} : undef
+                content => {
+                    repo       => $repo->as_string,
+                    collection => 'app.bsky.actor.profile',
+                    rkey       => 'self',
+                    record     => { %updated, type => 'app.bsky.actor.profile' },
+                    swapRecord => $existing ? $existing->{cid} : undef
+                }
             );
             return $okay if $okay;
         }
