@@ -73,13 +73,13 @@ package At 1.0 {
     }
     #
     sub createAccount ( $s, %args ) {
-        my $session = At::com::atproto::server::createAccount( $s, %args );
+        my $session = At::com::atproto::server::createAccount( $s, content => \%args );
         $s->{http}->_set_session($session) if $session;
         $session;
     }
 
     sub login ( $s, %args ) {
-        my ( $session, $headers ) = At::com::atproto::server::createSession( $s, %args );
+        my ( $session, $headers ) = At::com::atproto::server::createSession( $s, content => \%args );
         $session || return $session;
         $s->{http}->_set_session($session);
         $session;
@@ -116,62 +116,71 @@ package At 1.0 {
     sub post ( $s, %args ) {
         At::com::atproto::repo::createRecord(
             $s,
-            repo       => $s->did,
-            collection => 'app.bsky.feed.post',
-            record     => { '$type' => 'app.bsky.feed.post', createdAt => Time::Moment->now->to_string, %args }
+            content => {
+                repo       => $s->did,
+                collection => 'app.bsky.feed.post',
+                record     => { '$type' => 'app.bsky.feed.post', createdAt => Time::Moment->now->to_string, %args }
+            }
         );
     }
 
     sub deletePost ( $s, $at_uri ) {
         $at_uri = At::Protocol::URI->new($at_uri) unless builtin::blessed $at_uri;
-        At::com::atproto::repo::deleteRecord( $s, repo => $s->did, collection => 'app.bsky.feed.post', rkey => $at_uri->rkey );
+        At::com::atproto::repo::deleteRecord( $s, content => { repo => $s->did, collection => 'app.bsky.feed.post', rkey => $at_uri->rkey } );
     }
 
     sub like ( $s, $at_uri, $cid ) {
         $at_uri = At::Protocol::URI->new($at_uri) unless builtin::blessed $at_uri;
         At::com::atproto::repo::createRecord(
             $s,
-            repo       => $s->did,
-            collection => 'app.bsky.feed.like',
-            record     => {
-                '$type' => 'app.bsky.feed.like',
-                subject => {                       # com.atproto.repo.strongRef
-                    uri => $at_uri,
-                    cid => $cid
-                },
-                createdAt => Time::Moment->now->to_string
+            content => {
+                repo       => $s->did,
+                collection => 'app.bsky.feed.like',
+                record     => {
+                    '$type' => 'app.bsky.feed.like',
+                    subject => {                       # com.atproto.repo.strongRef
+                        uri => $at_uri,
+                        cid => $cid
+                    },
+                    createdAt => Time::Moment->now->to_string
+                }
             }
         );
     }
 
     sub deleteLike ( $s, $at_uri ) {
         $at_uri = At::Protocol::URI->new($at_uri) unless builtin::blessed $at_uri;
-        At::com::atproto::repo::deleteRecord( $s, repo => $s->did, collection => 'app.bsky.feed.like', rkey => $at_uri->rkey );
+        At::com::atproto::repo::deleteRecord( $s, content => { repo => $s->did, collection => 'app.bsky.feed.like', rkey => $at_uri->rkey } );
     }
 
     sub repost ( $s, $at_uri, $cid ) {
         $at_uri = At::Protocol::URI->new($at_uri) unless builtin::blessed $at_uri;
         At::com::atproto::repo::createRecord(
             $s,
-            repo       => $s->did,
-            collection => 'app.bsky.feed.repost',
-            record     => {
-                '$type' => 'app.bsky.feed.repost',
-                subject => {                         # com.atproto.repo.strongRef
-                    uri => $at_uri,
-                    cid => $cid
-                },
-                createdAt => Time::Moment->now->to_string
+            content => {
+                repo       => $s->did,
+                collection => 'app.bsky.feed.repost',
+                record     => {
+                    '$type' => 'app.bsky.feed.repost',
+                    subject => {                         # com.atproto.repo.strongRef
+                        uri => $at_uri,
+                        cid => $cid
+                    },
+                    createdAt => Time::Moment->now->to_string
+                }
             }
         );
     }
 
     sub deleteRepost ( $s, $at_uri ) {
         $at_uri = At::Protocol::URI->new($at_uri) unless builtin::blessed $at_uri;
-        At::com::atproto::repo::deleteRecord( $s, repo => $s->did, collection => 'app.bsky.feed.repost', rkey => $at_uri->rkey );
+        At::com::atproto::repo::deleteRecord( $s, content => { repo => $s->did, collection => 'app.bsky.feed.repost', rkey => $at_uri->rkey } );
     }
 
-    #~ await agent.uploadBlob(data, opts)
+    sub uploadBlob ( $s, $data, $type //= () ) {
+        At::com::atproto::repo::uploadBlob( $s, content => $data, defined $type ? ( headers => +{ 'Content-type' => $type } ) : () );
+    }
+
     #~  Social graph
     #~ await agent.getFollows(params, opts)
     #~ await agent.getFollowers(params, opts)
@@ -202,7 +211,6 @@ package At 1.0 {
         ();
     }
 
-    #~ await agent.upsertProfile(updateFn)
     #~ await agent.getProfiles(params, opts)
     #~ await agent.getSuggestions(params, opts)
     #~ await agent.searchActors(params, opts)
@@ -322,7 +330,8 @@ package At 1.0 {
                             my $_rate_meta
                                 = $rate_category eq 'createSession' ? $args{identifier} : $rate_category eq 'updateHandle' ? $args{did} : ();
                             $s->_ratecheck( $rate_category, $_rate_meta );
-                            my ( $content, $headers ) = $s->{http}->post( $s->{service}->as_string . ( '/xrpc/' . $fqdn ), { content => \%args } );
+                            my ( $content, $headers )
+                                = $s->{http}->post( $s->{service}->as_string . ( '/xrpc/' . $fqdn ), { content => delete $args{content}, %args } );
 
                             #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
                             $s->ratelimit_( { map { $_ => $headers->{ 'ratelimit-' . $_ } } qw[limit remaining reset] }, $rate_category,
@@ -384,6 +393,7 @@ package At 1.0 {
         },
         boolean => sub ( $namespace, $schema, $data ) { !!$data },
         bytes   => sub ( $namespace, $schema, $data ) {$data},
+        blob    => sub ( $namespace, $schema, $data ) {$data},
         integer => sub ( $namespace, $schema, $data ) { int $data },
         object  => sub ( $namespace, $schema, $data ) {
 
@@ -995,7 +1005,7 @@ package    #
         wantarray ? ( $res->{content}, $res->{headers} ) : $res->{content};
     }
 
-    sub post ( $s, $url, $req = () ) {
+    sub post ( $s, $url, $req //= () ) {
         my $res = $s->{agent}->post(
             $url,
             {   defined $req->{headers} ? ( headers => $req->{headers} )                                                     : (),
