@@ -58,7 +58,7 @@ package At 1.0 {
             if defined $rate->{reset} && $rate->{remaining} == 0 && $rate->{reset} > time;
         my $percent = _percent( $rate->{remaining}, $rate->{limit} );
         warnings::warnif(
-            At => sprintf '%.2f of %s rate limit remaining (%d of %d). Slow down or try again in %s',
+            At => sprintf '%.2f%% of %s rate limit remaining (%d of %d). Slow down or try again in %s',
             $percent, $type, $rate->{remaining}, $rate->{limit}, _duration( $rate->{reset} - time )
         ) if $percent <= 5;
     }
@@ -70,6 +70,31 @@ package At 1.0 {
 
     sub session($s) {
         $s->{http}->session;
+    }
+
+    sub _decode_token ($token) {
+        use MIME::Base64 qw[decode_base64];
+        use JSON::Tiny   qw[decode_json];
+        my ( $header, $payload, $sig ) = split /\./, $token;
+        $payload =~ tr[-_][+/];    # Replace Base64-URL characters with standard Base64
+        decode_json decode_base64 $payload;
+    }
+
+    sub resumeSession( $s, %session ) {
+        my $access  = _decode_token $session{accessJwt};
+        my $refresh = _decode_token $session{refreshJwt};
+        my $session;
+        if ( time > $access->{exp} && time < $refresh->{exp} ) {
+
+            # Attempt to use refresh token which has a 90 day life span as of Jan. 2024
+            ( $session, my $headers ) = At::com::atproto::server::refreshSession( $s, content => $session{refreshJwt} );
+            $session || return $session;
+        }
+        else {
+            $session = \%session;
+        }
+        $s->{http}->_set_session($session);
+        $session;
     }
     #
     sub createAccount ( $s, %args ) {
