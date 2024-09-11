@@ -172,7 +172,7 @@ package At 1.0 {
     }
 
     #~ await agent.uploadBlob(data, opts)
-    #~ // Social graph
+    #~  Social graph
     #~ await agent.getFollows(params, opts)
     #~ await agent.getFollowers(params, opts)
     #~ await agent.follow(did)
@@ -213,11 +213,11 @@ package At 1.0 {
     #~ await agent.unmuteModList(listUri)
     #~ await agent.blockModList(listUri)
     #~ await agent.unblockModList(listUri)
-    #~ // Notifications
+    #~  Notifications
     #~ await agent.listNotifications(params, opts)
     #~ await agent.countUnreadNotifications(params, opts)
     #~ await agent.updateSeenNotifications()
-    #~ // Identity
+    #~  Identity
     #~ await agent.resolveHandle(params, opts)
     #~ await agent.updateHandle(params, opts)
     #
@@ -669,9 +669,7 @@ package    #
     sub as_string( $s, $sep //= '&' ) {
         join $sep, map { join '=', uri_escape_utf8( $_->[0] ), uri_escape_utf8( $_->[1] ) } @$s;
     }
-}
-package                        #
-    At::Protocol::URI 1.0 {    # https://atproto.com/specs/at-uri-scheme
+    };
 package    # https://github.com/bluesky-social/atproto/blob/main/packages/syntax/src/nsid.ts
     At::Protocol::NSID 1.0 {
     use v5.38;
@@ -757,6 +755,12 @@ package    # https://github.com/bluesky-social/atproto/blob/main/packages/syntax
         1;
     }
     };
+package                        # https://atproto.com/specs/at-uri-scheme
+    At::Protocol::URI 1.0 {    # https://github.com/bluesky-social/atproto/blob/main/packages/syntax/src/aturi.ts
+    use v5.38;
+    no warnings qw[experimental::builtin experimental::try];
+    use Carp qw[carp confess];
+    use feature 'try';
     use overload
         '""' => sub ( $s, $u, $q ) {
         $s->as_string;
@@ -774,16 +778,34 @@ package    # https://github.com/bluesky-social/atproto/blob/main/packages/syntax
         qr/^(\/[^?#\s]*)?(\?[^#\s]+)?(#[^\s]+)?$/i;
     }
 
-    sub new( $class, $uri ) {
+    sub new( $class, $uri, $base //= () ) {
         $uri = URI->new($uri) unless builtin::blessed $uri;
-        use Data::Dump;
+        my $parsed;
+        if ( defined $base ) {
+            $base   = URI->new($base) unless builtin::blessed $base;
+            $parsed = _parse($base);
+            $parsed // confess 'Invalid AT URI: ' . $base;
+            my $relativep = _parseRelative($uri);
+            $relativep // confess 'Invalid path: ' . $uri;
+            %$parsed = ( %$parsed, %$relativep );
+        }
+        else {
+            $parsed = _parse($uri);
+            $parsed // confess 'Invalid AT URI: ' . $uri;
+        }
+        bless $parsed, $class;
+    }
+
+    sub _parse($uri) {
         my @res = $uri->as_string =~ ATP_URI_REGEX();
-        bless {
-            hash         => $res[4] // '',
-            host         => $res[1] // '',
-            pathname     => $res[2] // '',
-            searchParams => At::Protocol::URI::_query->new( $res[3] // '' )
-        }, $class;
+        @res or return;
+        { hash => $res[4] // '', host => $res[1] // '', pathname => $res[2] // '', searchParams => At::Protocol::URI::_query->new( $res[3] // '' ) };
+    }
+
+    sub _parseRelative($uri) {
+        my @res = $uri->as_string =~ RELATIVE_REGEX();
+        @res or return;
+        { hash => $res[2] // '', pathname => $res[0] // '', searchParams => At::Protocol::URI::_query->new( $res[1] // '' ) };
     }
 
     sub as_string($s) {
@@ -824,7 +846,102 @@ package    # https://github.com/bluesky-social/atproto/blob/main/packages/syntax
         $parts[1] = $v;
         $s->pathname( join '/', @parts );
     }
-}
+
+    #~ Validation utils from https://github.com/bluesky-social/atproto/blob/main/packages/syntax/src/aturi_validation.ts
+    #~  Human-readable constraints on ATURI:
+    #~    - following regular URLs, a 8KByte hard total length limit
+    #~    - follows ATURI docs on website
+    #~       - all ASCII characters, no whitespace. non-ASCII could be URL-encoded
+    #~       - starts "at://"
+    #~       - "authority" is a valid DID or a valid handle
+    #~       - optionally, follow "authority" with "/" and valid NSID as start of path
+    #~       - optionally, if NSID given, follow that with "/" and rkey
+    #~       - rkey path component can include URL-encoded ("percent encoded"), or:
+    #~           ALPHA / DIGIT / "-" / "." / "_" / "~" / ":" / "@" / "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="
+    #~           [a-zA-Z0-9._~:@!$&'\(\)*+,;=-]
+    #~       - rkey must have at least one char
+    #~       - regardless of path component, a fragment can follow  as "#" and then a JSON pointer (RFC-6901)
+    sub ensureValidAtUri($uri) {
+        my $fragmentPart;
+        my @uriParts = split '#', $uri, -1;    # negative limit, ftw
+        confess 'ATURI can have at most one "#", separating fragment out' if scalar @uriParts > 2;
+        $fragmentPart = $uriParts[1];
+        $uri          = $uriParts[0];
+
+        # Check that all chars are boring ASCII
+        confess 'Disallowed characters in ATURI (ASCII)' unless $uri =~ /^[a-zA-Z0-9._~:@!\$&')(*+,;=%\/-]*$/;
+        #
+        my @parts = split /\//, $uri, -1;      # negative limit, ftw
+        confess 'ATURI must start with "at://"'                         if scalar @parts >= 3 && ( $parts[0] ne 'at:' || length $parts[1] );
+        confess 'ATURI requires at least method and authority sections' if scalar @parts < 3;
+        try {
+            if ( $parts[2] =~ m/^did:/ ) {
+                At::Protocol::DID::ensureValidDid( $parts[2] );
+            }
+            else { At::Protocol::Handle::ensureValidHandle( $parts[2] ) }
+        }
+        catch ($err) {
+            confess 'ATURI authority must be a valid handle or DID';
+        };
+        if ( scalar @parts >= 4 ) {
+            if ( !length $parts[3] ) {
+                confess 'ATURI can not have a slash after authority without a path segment';
+            }
+            try {
+                At::Protocol::NSID::ensureValidNsid( $parts[3] );
+            }
+            catch ($err) {
+                confess 'ATURI requires first path segment (if supplied) to be valid NSID'
+            }
+        }
+        if ( scalar @parts >= 5 ) {
+            confess 'ATURI can not have a slash after collection, unless record key is provided' if !length $parts[4]
+
+            # would validate rkey here, but there are basically no constraints!
+        }
+        confess 'ATURI path can have at most two parts, and no trailing slash' if scalar @parts >= 6;
+        confess 'ATURI fragment must be non-empty and start with slash'        if scalar @uriParts >= 2 && !defined $fragmentPart;
+        if ( defined $fragmentPart ) {
+            confess 'ATURI fragment must be non-empty and start with slash' if length $fragmentPart == 0 || substr( $fragmentPart, 0, 1 ) ne '/';
+
+            # NOTE: enforcing *some* checks here for sanity. Eg, at least no whitespace
+            confess 'Disallowed characters in ATURI fragment (ASCII)' . $fragmentPart if $fragmentPart !~ /^\/[a-zA-Z0-9._~:@!\$&')(*+,;=%[\]\/-]*$/;
+        }
+        confess 'ATURI is far too long' if length $uri > 8 * 1024;
+        1;
+    }
+
+    sub ensureValidAtUriRegex($uri) {
+
+        #~ simple regex to enforce most constraints via just regex and length.
+        my $aturiRegex
+            = qr/^at:\/\/(?<authority>[a-zA-Z0-9._:%-]+)(\/(?<collection>[a-zA-Z0-9-.]+)(\/(?<rkey>[a-zA-Z0-9._~:@!\$&%')(*+,;=-]+))?)?(#(?<fragment>\/[a-zA-Z0-9._~:@!\$&%')(*+,;=\-[\]\/\\]*))?$/;
+        my ($rm) = $uri =~ $aturiRegex;
+        confess q[ATURI didn't validate via regex] if !$rm && !keys %+;
+        my %groups = %+;
+        try {
+            At::Protocol::Handle::ensureValidHandleRegex( $groups{authority} )
+        }
+        catch ($err) {
+            try {
+                At::Protocol::DID::ensureValidDidRegex( $groups{authority} )
+            }
+            catch ($err) {
+                confess 'ATURI authority must be a valid handle or DID'
+            }
+        }
+        if ( defined $groups{collection} ) {
+            try {
+                At::Protocol::NSID::ensureValidNsidRegex( $groups{collection} )
+            }
+            catch ($err) {
+                confess 'ATURI collection path segment must be a valid NSID'
+            }
+        }
+        confess 'ATURI is far too long' if length $uri > 8 * 1024;
+        1;
+    }
+    };
 package    #
     At::Error 1.0 {
     use v5.38;

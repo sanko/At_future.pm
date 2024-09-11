@@ -1,4 +1,7 @@
-use Test2::V0;
+use Test2::V0 '!subtest';
+use Test2::Util::Importer 'Test2::Tools::Subtest' => ( subtest_streamed => { -as => 'subtest' } );
+use Test2::Plugin::UTF8;
+use Path::Tiny qw[path];
 use v5.36;
 use lib '../eg/', 'eg', '../lib', 'lib';
 #
@@ -201,6 +204,205 @@ subtest 'supports modifications' => sub {
         is $urip, 'at://foo.com/foo?foo=bar&baz=buux#hash', 'hash: #hash';
         $urip->hash('hash');
         is $urip, 'at://foo.com/foo?foo=bar&baz=buux#hash', 'hash: hash';
+    };
+};
+subtest 'supports relative URIs' => sub {
+    my @tests = (
+
+        # [ input, host, path, query, hash]
+        [ '', '', '', '' ], [ '/', '/', '', '' ], [ '/foo', '/foo', '', '' ], [ '/foo/', '/foo/', '', '' ], [ '/foo/bar', '/foo/bar', '', '' ],
+        [ '?foo=bar',     '',     'foo=bar', '' ], [ '?foo=bar&baz=buux', '',      'foo=bar&baz=buux', '' ], [ '/?foo=bar', '/', 'foo=bar', '' ],
+        [ '/foo?foo=bar', '/foo', 'foo=bar', '' ], [ '/foo/?foo=bar',     '/foo/', 'foo=bar',          '' ], [ '#hash',     '',  '',        '#hash' ],
+        [ '/#hash',       '/',    '',        '#hash' ], [ '/foo#hash', '/foo', '', '#hash' ],                [ '/foo/#hash', '/foo/', '', '#hash' ],
+        [ '?foo=bar#hash', '',    'foo=bar', '#hash' ]
+    );
+    my @bases = (
+        'did:web:localhost%3A1234',                                    'at://did:web:localhost%3A1234',
+        'at://did:web:localhost%3A1234/foo/bar?foo=bar&baz=buux#hash', 'did:web:localhost%3A1234',
+        'at://did:web:localhost%3A1234',                               'at://did:web:localhost%3A1234/foo/bar?foo=bar&baz=buux#hash'
+    );
+    for my $base (@bases) {
+        subtest 'base: ' . $base => sub {
+            isa_ok my $basep = At::Protocol::URI->new($base), ['At::Protocol::URI'], '$basep = ...->new( "' . $base . '" )';
+            for my $test (@tests) {
+                subtest 'rel: ' . $test->[0] => sub {
+                    isa_ok my $urip = At::Protocol::URI->new( $test->[0], $base ), ['At::Protocol::URI'],
+                        '->new( "' . $base . '", "' . $test->[0] . '" )';
+                    is $urip->protocol, 'at:',          '->protocol';
+                    is $urip->host,     $basep->host,   '->host matches $basep->host';
+                    is $urip->origin,   $basep->origin, '->origin matches $basep->origin';
+                    is $urip->pathname, $test->[1],     '->pathname';
+                    is $urip->search,   $test->[2],     '->search';
+                    is $urip->hash,     $test->[3],     '->hash';
+                }
+            }
+        };
+    }
+};
+subtest 'AT URI validation' => sub {
+
+    sub expectValid($uri) {
+        subtest $uri => sub {
+            ok At::Protocol::URI::ensureValidAtUri($uri),      'ensureValidAtUri( ... )';
+            ok At::Protocol::URI::ensureValidAtUriRegex($uri), 'ensureValidAtUriRegex( ... )';
+        }
+    }
+
+    sub expectInvalid($uri) {
+        subtest $uri => sub {
+            ok dies { At::Protocol::URI::ensureValidAtUri($uri) }, 'ensureValidAtUri( ... ) dies';
+            ok dies { At::Protocol::URI::ensureValidAtUri($uri) }, 'ensureValidAtUriRegex( ... ) dies';
+        }
+    }
+    subtest 'enfore spec basics' => sub {
+        expectValid('at://did:plc:asdf123');
+        expectValid('at://user.bsky.social');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/record');
+        #
+        expectValid('at://did:plc:asdf123#/frag');
+        expectValid('at://user.bsky.social#/frag');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post#/frag');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/record#/frag');
+        #
+        expectInvalid('a://did:plc:asdf123');
+        expectInvalid('at//did:plc:asdf123');
+        expectInvalid('at:/a/did:plc:asdf123');
+        expectInvalid('at:/did:plc:asdf123');
+        expectInvalid('AT://did:plc:asdf123');
+        expectInvalid('http://did:plc:asdf123');
+        expectInvalid('://did:plc:asdf123');
+        expectInvalid('at:did:plc:asdf123');
+        expectInvalid('at:/did:plc:asdf123');
+        expectInvalid('at:///did:plc:asdf123');
+        expectInvalid('at://:/did:plc:asdf123');
+        expectInvalid('at:/ /did:plc:asdf123');
+        expectInvalid('at://did:plc:asdf123 ');
+        expectInvalid('at://did:plc:asdf123/ ');
+        expectInvalid(' at://did:plc:asdf123');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed.post ');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed.post# ');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed.post#/ ');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed.post#/frag ');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed.post#fr ag');
+        expectInvalid('//did:plc:asdf123');
+        expectInvalid('at://name');
+        expectInvalid('at://name.0');
+        expectInvalid('at://diD:plc:asdf123');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed.p@st');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed.p$st');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed.p%st');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed.p&st');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed.p()t');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed_post');
+        expectInvalid('at://did:plc:asdf123/-com.atproto.feed.post');
+        expectInvalid('at://did:plc:asdf@123/com.atproto.feed.post');
+        #
+        expectInvalid('at://DID:plc:asdf123');
+        expectInvalid('at://user.bsky.123');
+        expectInvalid('at://bsky');
+        expectInvalid('at://did:plc:');
+        expectInvalid('at://did:plc:');
+        expectInvalid('at://frag');
+        #
+        expectValid( 'at://did:plc:asdf123/com.atproto.feed.post/' . ( 'o' x 800 ) );
+        expectInvalid( 'at://did:plc:asdf123/com.atproto.feed.post/' . ( 'o' x 8200 ) );
+    };
+    subtest 'has specified behavior on edge cases' => sub {
+        expectInvalid('at://user.bsky.social//');
+        expectInvalid('at://user.bsky.social//com.atproto.feed.post');
+        expectInvalid('at://user.bsky.social/com.atproto.feed.post//');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed.post/asdf123/more/more');
+        expectInvalid('at://did:plc:asdf123/short/stuff');
+        expectInvalid('at://did:plc:asdf123/12345');
+    };
+    subtest 'enforces no trailing slashes' => sub {
+        expectValid('at://did:plc:asdf123');
+        expectInvalid('at://did:plc:asdf123/');
+        #
+        expectValid('at://user.bsky.social');
+        expectInvalid('at://user.bsky.social/');
+        #
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed.post/');
+        #
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/record');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed.post/record/');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed.post/record/#/frag');
+    };
+    subtest 'enforces strict paths' => sub {
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/asdf123');
+        expectInvalid('at://did:plc:asdf123/com.atproto.feed.post/asdf123/asdf');
+    };
+    subtest 'is very permissive about record keys' => sub {
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/asdf123');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/a');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/%23');
+        #
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/$@!*)(:,;~.sdf123');
+        expectValid("at://did:plc:asdf123/com.atproto.feed.post/~'sdf123");
+        #
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/$');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/@');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/!');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/*');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/(');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/,');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/;');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/abc%30123');
+    };
+    subtest 'is probably too permissive about URL encoding' => sub {
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/%30');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/%3');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/%');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/%zz');
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post/%%%');
+    };
+    subtest 'is very permissive about fragments' => sub {
+        expectValid('at://did:plc:asdf123#/frac');
+        #
+        expectInvalid('at://did:plc:asdf123#');
+        expectInvalid('at://did:plc:asdf123##');
+        expectInvalid('#at://did:plc:asdf123');
+        expectInvalid('at://did:plc:asdf123#/asdf#/asdf');
+        #
+        expectValid('at://did:plc:asdf123#/com.atproto.feed.post');
+        expectValid('at://did:plc:asdf123#/com.atproto.feed.post/');
+        expectValid('at://did:plc:asdf123#/asdf/');
+        #
+        expectValid('at://did:plc:asdf123/com.atproto.feed.post#/$@!*():,;~.sdf123');
+        expectValid('at://did:plc:asdf123#/[asfd]');
+        #
+        expectValid('at://did:plc:asdf123#/$');
+        expectValid('at://did:plc:asdf123#/*');
+        expectValid('at://did:plc:asdf123#/;');
+        expectValid('at://did:plc:asdf123#/,');
+    };
+    subtest 'conforms to interop valid ATURIs' => sub {
+        my $path = path(__FILE__)->sibling('interop-test-files')->child(qw[syntax aturi_syntax_valid.txt])->realpath;
+        $path // skip_all 'failed to locate invalid test data';
+        for my $line ( grep {length} $path->lines( { chomp => 1 } ) ) {
+            if ( $line =~ /^#\s*/ ) {
+
+                #~ diag $';
+                next;
+            }
+            expectValid($line);
+        }
+    };
+    subtest 'conforms to interop invalid ATURIs' => sub {
+        my $todo
+            = todo 'Like the official project, this package is currently more permissive than spec about AT URIs, so invalid cases are not errors';
+        my $path = path(__FILE__)->sibling('interop-test-files')->child(qw[syntax aturi_syntax_invalid.txt])->realpath;
+        $path // skip_all 'failed to locate invalid test data';
+        for my $line ( grep {length} $path->lines( { chomp => 1 } ) ) {
+            if ( $line =~ /^#\s*/ ) {
+
+                #~ diag $';
+                next;
+            }
+            expectInvalid($line);
+        }
     };
 };
 #
