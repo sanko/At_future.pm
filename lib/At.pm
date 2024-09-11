@@ -307,6 +307,7 @@ package At 1.0 {
                 for my ( $name, $schema )( %{ $raw->{defs} } ) {
                     my $fqdn = $raw->{id} . ( $name eq 'main' ? '' : '#' . $name );    # RDN
                     if ( $schema->{type} eq 'array' ) {
+                        _set_capture( $fqdn, $schema );
                     }
                     elsif ( $schema->{type} eq 'object' ) {
                         _set_capture( $fqdn, $schema );
@@ -352,7 +353,7 @@ package At 1.0 {
                     elsif ( $schema->{type} eq 'record' ) {
                         _set_capture( join( '.', $raw->{id}, ( $name eq 'main' ? () : $name ) ), $schema );
                     }
-                    elsif ( $schema->{type} eq 'string' )       { }
+                    elsif ( $schema->{type} eq 'string' )       { _set_capture( $fqdn, $schema ); }
                     elsif ( $schema->{type} eq 'subscription' ) { }
                     elsif ( $schema->{type} eq 'token' ) {    # Generally just a string
                         my $namespace = $fqdn =~ s[[#\.]][::]gr;
