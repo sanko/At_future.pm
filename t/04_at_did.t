@@ -78,8 +78,10 @@ subtest 'conforms to interop valid DIDs' => sub {
     $path // skip_all 'failed to locate valid test data';
     for my $line ( grep {length} $path->lines( { chomp => 1 } ) ) {
         if ( $line =~ /^#\s*/ ) {
+
             #~ diag $';
-            next; }
+            next;
+        }
         expectValid($line);
     }
 };
@@ -88,8 +90,10 @@ subtest 'conforms to interop invalid DIDs' => sub {
     $path // skip_all 'failed to locate invalid test data';
     for my $line ( grep {length} $path->lines( { chomp => 1 } ) ) {
         if ( $line =~ /^#\s*/ ) {
+
             #~ diag $';
-            next; }
+            next;
+        }
         expectInvalid($line);
     }
 };

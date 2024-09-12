@@ -64,12 +64,13 @@ package At 1.0 {
     }
 
     sub did ($s) {
-        my $session = $s->{http}->session;
+        my $session = $s->session;
         defined $session ? $session->{did} : ();
     }
 
     sub session($s) {
-        $s->{http}->session;
+        my $session = $s->{http}->session;
+        $session // $session->{http}->_set_session( At::com::atproto::server::getSession($s) );
     }
 
     sub _decode_token ($token) {
@@ -87,7 +88,8 @@ package At 1.0 {
         if ( time > $access->{exp} && time < $refresh->{exp} ) {
 
             # Attempt to use refresh token which has a 90 day life span as of Jan. 2024
-            ( $session, my $headers ) = At::com::atproto::server::refreshSession( $s, content => $session{refreshJwt} );
+            ( $session, my $headers )
+                = At::com::atproto::server::refreshSession( $s, headers => { Authorization => 'Bearer ' . $session{refreshJwt} } );
             $session || return $session;
         }
         else {
