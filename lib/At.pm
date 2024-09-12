@@ -12,6 +12,8 @@ package At 1.0 {
     use Time::Moment;    # Internal; standardize around Zulu
     use URI;
     #
+    use At::Error;
+    #
     use Data::Dump;
     #
     $|++;
@@ -32,7 +34,11 @@ package At 1.0 {
     sub new ( $class, %args ) {
         $args{service} // Carp::croak 'At requires a service';
         $args{service} = URI->new( $args{service} ) unless builtin::blessed $args{service};
-        $args{http} //= Mojo::UserAgent->can('start') ? At::UserAgent::Mojo->new(%args) : At::UserAgent::Tiny->new(%args);
+        $args{http} //= Mojo::UserAgent->can('start') ? At::UserAgent::Mojo->new(%args) : sub {
+            require At::UserAgent::Tiny;
+            At::UserAgent::Tiny->new(%args);
+            }
+            ->();
         bless {
             http       => $args{http},
             service    => $args{service},
@@ -230,8 +236,7 @@ package At 1.0 {
         At::com::atproto::repo::deleteRecord( $s, content => { repo => $s->did, collection => 'app.bsky.graph.follow', rkey => $at_uri->rkey } );
     }
 
-    # // Actors
-    # Jumping ahead for a sec
+    # Actors
     sub getProfile ( $s, %args ) {
         At::app::bsky::actor::getProfile( $s, %args );
     }
@@ -1000,106 +1005,6 @@ package                        # https://atproto.com/specs/at-uri-scheme
         1;
     }
     };
-package    #
-    At::Error 1.0 {
-    use v5.38;
-    use overload
-        bool => sub {0},
-        '""' => sub ( $s, $u, $q ) { $s->{message} // 'Unknown error' };
-    sub new ( $class, $args ) { bless $args, $class }
-}
-package    #
-    At::UserAgent 1.0 {
-    use v5.38;
-    sub new  {...}
-    sub get  {...}
-    sub post {...}
-    sub _set_session ( $s, $session ) {...}
-    sub session      ($s)             {...}
-    sub ratelimit    ($s)             {...}
-}
-package    #
-    At::UserAgent::Tiny 1.0 {
-    use v5.38;
-    use parent -norequire, 'At::UserAgent';
-    use HTTP::Tiny;
-    use JSON::Tiny qw[decode_json encode_json];
-    use warnings::register;
-    no warnings qw[experimental::builtin];
-    #
-    sub new ( $class, %args ) {
-        bless {
-            agent => $args{agent} // HTTP::Tiny->new(
-                agent           => sprintf( 'At.pm/%1.2f; ', $At::VERSION ),
-                default_headers => {
-                    'Content-Type' => 'application/json',
-                    Accept         => 'application/json',
-                    ( $args{'language'} ? ( 'Accept-Language' => $args{'language'} ) : () )
-                }
-            ),
-            ( defined $args{session} ? ( session => $args{session} ) : () )
-        }, $class;
-    }
-
-    sub get ( $s, $url, $req //= {} ) {
-        my $res
-            = $s->{agent}
-            ->get( $url . ( defined $req->{content} && keys %{ $req->{content} } ? '?' . $s->{agent}->www_form_urlencode( $req->{content} ) : '' ),
-            { defined $req->{headers} ? ( headers => $req->{headers} ) : () } );
-        if ( !$res->{success} ) {
-            my $err = At::Error->new( decode_json $res->{content} );
-            return wantarray ? ( $err, $res->{headers} ) : $err;
-        }
-        $res->{content} = decode_json $res->{content} if $res->{content} && $res->{headers}{'content-type'} =~ m[application/json];
-        wantarray ? ( $res->{content}, $res->{headers} ) : $res->{content};
-    }
-
-    sub post ( $s, $url, $req //= {} ) {
-        my $res = $s->{agent}->post(
-            $url,
-            {   defined $req->{headers} ? ( headers => $req->{headers} )                                                               : (),
-                defined $req->{content} ? ( content => ref $req->{content} eq 'HASH' ? encode_json $req->{content} : $req->{content} ) : ()
-            }
-        );
-        if ( !$res->{success} ) {
-            my $err = At::Error->new( decode_json $res->{content} );
-            return wantarray ? ( $err, $res->{headers} ) : $err;
-        }
-        $res->{content} = decode_json $res->{content} if $res->{content} && $res->{headers}{'content-type'} =~ m[application/json];
-
-        #~ use Data::Dump;
-        #~ ddx $res;
-        wantarray ? ( $res->{content}, $res->{headers} ) : $res->{content};
-    }
-    sub websocket ( $s, $url, $req = () ) {...}
-
-    sub _set_session ( $s, $session ) {
-        $s->{session} = $session;
-        $s->_set_bearer_token( 'Bearer ' . $s->{session}{accessJwt} );
-    }
-
-    sub session ($s) {
-        $s->{session} // ();
-    }
-
-    sub _set_bearer_token ( $s, $token ) {
-        $s->{agent}->{default_headers}{Authorization} = $token;
-    }
-
-    sub ratelimit($s) {
-        $s->{ratelimit} // ();
-    }
-}
-package    #
-    At::UserAgent::Mojo 1.0 {
-    use v5.38;
-    use parent -norequire, 'At::UserAgent';
-}
-package    #
-    At::UserAgent::Async 1.0 {
-    use v5.38;
-    use parent -norequire, 'At::UserAgent';
-}
 1;
 __END__
 # https://github.com/bluesky-social/atproto/tree/main/packages/api
