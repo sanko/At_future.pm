@@ -70,7 +70,7 @@ package At 1.0 {
 
     sub session($s) {
         my $session = $s->{http}->session;
-        $session // $session->{http}->_set_session( At::com::atproto::server::getSession($s) );
+        $session // $s->{http}->_set_session( At::com::atproto::server::getSession($s) );
     }
 
     sub _decode_token ($token) {
@@ -588,23 +588,24 @@ package                        #
     At::Protocol::DID 1.0 {    # https://atproto.com/specs/did
     use v5.38;
     use Carp qw[carp confess];
-    use URI;
-    no warnings qw[experimental::builtin];
+    no warnings qw[experimental::builtin experimental::try];
+    use feature 'try';
     use overload
         '""' => sub ( $s, $u, $q ) {
         $s->as_string;
         };
 
-    sub new( $class, $uri ) {
-        confess 'malformed DID URI: ' . $uri unless $uri =~ /^did:([a-z]+:[a-zA-Z0-9._:%-]*[a-zA-Z0-9._-])$/;
-        $uri = URI->new($1) unless builtin::blessed $uri;
-        my $scheme = $uri->scheme;
-        carp 'unsupported method: ' . $scheme unless $scheme =~ m/^(did|plc|web)$/;
-        bless \$uri, $class;
+    sub new( $class, $did ) {
+
+        #~ try {
+        #~ ensureValidDid($did);
+        #~ }
+        #~ catch ($err) { return; }
+        bless \$did, $class;
     }
 
     sub as_string($s) {
-        'did:' . $$s;
+        $$s;
     }
 
     #~ Taken from https://github.com/bluesky-social/atproto/blob/main/packages/syntax/src/did.ts
@@ -1010,15 +1011,17 @@ package    #
     no warnings qw[experimental::builtin];
     #
     sub new ( $class, %args ) {
-        $args{agent} //= HTTP::Tiny->new(
-            agent           => sprintf( 'At.pm/%1.2f; ', $At::VERSION ),
-            default_headers => {
-                'Content-Type' => 'application/json',
-                Accept         => 'application/json',
-                ( $args{'language'} ? ( 'Accept-Language' => $args{'language'} ) : () )
-            }
-        );
-        bless \%args, $class;
+        bless {
+            agent => $args{agent} // HTTP::Tiny->new(
+                agent           => sprintf( 'At.pm/%1.2f; ', $At::VERSION ),
+                default_headers => {
+                    'Content-Type' => 'application/json',
+                    Accept         => 'application/json',
+                    ( $args{'language'} ? ( 'Accept-Language' => $args{'language'} ) : () )
+                }
+            ),
+            ( defined $args{session} ? ( session => $args{session} ) : () )
+        }, $class;
     }
 
     sub get ( $s, $url, $req = () ) {
@@ -1037,8 +1040,8 @@ package    #
     sub post ( $s, $url, $req //= () ) {
         my $res = $s->{agent}->post(
             $url,
-            {   defined $req->{headers} ? ( headers => $req->{headers} )                                                     : (),
-                defined $req->{content} ? ( content => ref $req->{content} ? encode_json $req->{content} : $req->{content} ) : ()
+            {   defined $req->{headers} ? ( headers => $req->{headers} )                                                               : (),
+                defined $req->{content} ? ( content => ref $req->{content} eq 'HASH' ? encode_json $req->{content} : $req->{content} ) : ()
             }
         );
         if ( !$res->{success} ) {
@@ -1046,6 +1049,9 @@ package    #
             return wantarray ? ( $err, $res->{headers} ) : $err;
         }
         $res->{content} = decode_json $res->{content} if $res->{content} && $res->{headers}{'content-type'} =~ m[application/json];
+
+        #~ use Data::Dump;
+        #~ ddx $res;
         wantarray ? ( $res->{content}, $res->{headers} ) : $res->{content};
     }
     sub websocket ( $s, $url, $req = () ) {...}
@@ -1056,7 +1062,7 @@ package    #
     }
 
     sub session ($s) {
-        $s->{session};
+        $s->{session} // ();
     }
 
     sub _set_bearer_token ( $s, $token ) {
