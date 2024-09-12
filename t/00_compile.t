@@ -46,13 +46,11 @@ subtest 'client clones correctly' => sub {
     is $bsky->{session},  $bsky2->{session}, 'sessions match';
 };
 #
-SKIP:
-subtest live => sub {
+subtest live => sub {    # Public and totally worthless auth info
     my $login;
-    my $auth;    # Public and totally worthless auth info
     my $path = path(__FILE__)->sibling('test_auth.json')->realpath;
     skip_all 'failed to locate auth data' unless $path->exists;
-    $auth = decode_json $path->slurp_utf8;
+    my $auth = decode_json $path->slurp_utf8;
     subtest auth => sub {
         subtest resume => sub {
             skip_all 'no session to resume' unless keys %{ $auth->{resume} };
@@ -223,6 +221,47 @@ subtest live => sub {
                 };
                 etc;
             }, 'deletePost(...)';
+        };
+    }
+    subtest 'get our own follows' => sub {
+        $login || skip_all "$login";
+        is my $follows = $bsky->getFollows( $bsky->did ), hash {
+            field cursor  => E();
+            field follows => D();    # array of At::Lexicon::app::bsky::actor::defs::profileView objects
+            field subject => D();    # profileview
+            end;
+        }, 'getFollows( ... )';
+    };
+    subtest 'get our own followers' => sub {
+        $login || skip_all "$login";
+        is my $followers = $bsky->getFollowers( $bsky->did ), hash {
+            field cursor    => E();
+            field followers => D();    # array of At::Lexicon::app::bsky::actor::defs::profileView objects
+            field subject   => D();    # profileview
+            end;
+        }, 'getFollowers( ... )';
+    };
+    {
+        my $follow;
+        subtest 'follow myself' => sub {
+            $login || skip_all "$login";
+            is $follow = $bsky->follow( $bsky->did ), hash {
+                field cid => D();
+                field uri => D();
+                etc;    # might also contain commit and validationStatus
+            }, 'follow( ... )';
+        };
+        subtest 'delete the follow record we created earlier' => sub {
+            $login  || skip_all "$login";
+            $follow || skip_all "$follow";
+            is my $delete = $bsky->deleteFollow( $follow->{uri} ), hash {
+                field commit => hash {
+                    field cid => D();    # CID
+                    field rev => D();
+                    end;
+                };
+                etc;
+            }, 'deleteFollow(...)';
         };
     }
 };

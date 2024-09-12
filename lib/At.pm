@@ -203,11 +203,33 @@ package At 1.0 {
         At::com::atproto::repo::uploadBlob( $s, content => $data, defined $type ? ( headers => +{ 'Content-type' => $type } ) : () );
     }
 
-    #~  Social graph
-    #~ await agent.getFollows(params, opts)
-    #~ await agent.getFollowers(params, opts)
-    #~ await agent.follow(did)
-    #~ await agent.deleteFollow(followUri)
+    #  Social graph
+    sub getFollows ( $s, $actor, $type //= (), $cursor //= () ) {
+        At::app::bsky::graph::getFollows( $s,
+            content => { actor => $actor, defined $type ? ( type => $type ) : (), defined $cursor ? ( cursor => $cursor ) : () } );
+    }
+
+    sub getFollowers ( $s, $actor, $type //= (), $cursor //= () ) {
+        At::app::bsky::graph::getFollowers( $s,
+            content => { actor => $actor, defined $type ? ( type => $type ) : (), defined $cursor ? ( cursor => $cursor ) : () } );
+    }
+
+    sub follow ( $s, $did ) {
+        At::com::atproto::repo::createRecord(
+            $s,
+            content => {
+                repo       => $s->did,
+                collection => 'app.bsky.graph.follow',
+                record     => { '$type' => 'app.bsky.graph.follow', subject => $did, createdAt => Time::Moment->now->to_string }
+            }
+        );
+    }
+
+    sub deleteFollow ( $s, $at_uri ) {
+        $at_uri = At::Protocol::URI->new($at_uri) unless builtin::blessed $at_uri;
+        At::com::atproto::repo::deleteRecord( $s, content => { repo => $s->did, collection => 'app.bsky.graph.follow', rkey => $at_uri->rkey } );
+    }
+
     # // Actors
     # Jumping ahead for a sec
     sub getProfile ( $s, %args ) {
