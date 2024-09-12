@@ -499,7 +499,8 @@ package At 1.0 {
 package                           #
     At::Protocol::Handle 1.0 {    # https://atproto.com/specs/handle
     use v5.38;
-    use Carp qw[carp confess];
+    use Carp      qw[carp confess];
+    use At::Error qw[register throw];
     use URI;
     use feature 'try';
     no warnings qw[experimental::builtin experimental::try];
@@ -557,7 +558,7 @@ package                           #
     sub ensureValidHandle ($handle) {
 
         # check that all chars are boring ASCII
-        confess 'Disallowed characters in handle (ASCII letters, digits, dashes, periods only)' if $handle !~ /^[a-zA-Z0-9.-]*$/;
+        throw InvalidHandleError('Disallowed characters in handle (ASCII letters, digits, dashes, periods only)') if $handle !~ /^[a-zA-Z0-9.-]*$/;
         #
         confess 'Handle is too long (253 chars max)' if length $handle > 253;
         #
@@ -606,6 +607,11 @@ package                           #
         }
         1;
     }
+    #
+    register 'InvalidHandleError';
+    register 'ReservedHandleError';
+    register 'UnsupportedDomainError';
+    register 'DisallowedDomainError';
     };
 package                        #
     At::Protocol::DID 1.0 {    # https://atproto.com/specs/did

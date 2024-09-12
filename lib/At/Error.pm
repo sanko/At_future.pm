@@ -1,9 +1,36 @@
 package At::Error 1.0 {
     use v5.38;
+    use Carp;
+    use parent 'Exporter';
+    our @EXPORT = qw[throw register];
     use overload
         bool => sub {0},
-        '""' => sub ( $s, $u, $q ) { $s->{message} // 'Unknown error' };
-    sub new ( $class, $args ) { bless $args, $class }
+        '""' => sub ( $s, $u, $q ) { $s->[0] };
+
+    # TODO: What should I do with description? Nothing?
+    sub new ( $class, $message, $description //= () ) {
+        my @stack;
+        my $i = 1;    # Skip one
+        while ( my %i = Carp::caller_info( ++$i ) ) {
+            next if $i{pack} eq __PACKAGE__;
+            push @stack, \%i;
+        }
+        bless [ $message, $description, 0, \@stack ], $class;
+    }
+
+    sub throw($s) {
+        my ( undef, $file, $line ) = caller();
+        ++$s->[2];    # Interesting. Maybe.
+        die join "\n\t", sprintf( q[%s at %s line %d], $s->[0], $file, $line ),
+            map { sprintf q[%s called at %s line %d], $_->{sub_name}, $_->{file}, $_->{line} } @{ $s->[3] };
+    }
+
+    sub register($class) {
+        my ($from) = caller;
+        no strict 'refs';
+        *{ $from . '::' . $class } = sub ( $message, $description //= () ) { ( __PACKAGE__ . '::_' . $class )->new( $message, $description ) };
+        push @{ __PACKAGE__ . '::_' . $class . '::ISA' }, __PACKAGE__;
+    }
 }
 1;
 __END__
@@ -11,21 +38,25 @@ __END__
 
 =head1 NAME
 
-At::Error - Throwable Error
+At::Error - Throwable Errors
 
 =head1 SYNOPSIS
 
-    use At; # You shouldn't be here yet.
+    use At::Error;    # You shouldn't be here yet.
+    register 'SomeError';
+
+    sub yay {
+
+        # Some stuff here ...
+        return SomeError('Oh, no!') if 'pretend someting bad happened';
+        return 1;
+    }
+    my $okay = yay();
+    throw $okay unless $okay;    # Errors overload bool to be false
 
 =head1 DESCRIPTION
 
-This is just a placeholder for now.
-
-At some point, errors will generate objects rather than just L<confess>ing.
-
-=head1 See Also
-
-L<At::UserAgent::Tiny> - default subclass based on L<HTTP::Tiny>
+You shouldn't be here.
 
 =head1 LICENSE
 
@@ -40,7 +71,7 @@ Sanko Robinson E<lt>sanko@cpan.orgE<gt>
 
 =begin stopwords
 
-atproto ing
+atproto
 
 =end stopwords
 
