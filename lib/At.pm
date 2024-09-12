@@ -68,11 +68,6 @@ package At 1.0 {
         defined $session ? $session->{did} : ();
     }
 
-    sub session($s) {
-        my $session = $s->{http}->session;
-        $session // $s->{http}->_set_session( At::com::atproto::server::getSession($s) );
-    }
-
     sub _decode_token ($token) {
         use MIME::Base64 qw[decode_base64];
         use JSON::Tiny   qw[decode_json];
@@ -80,22 +75,22 @@ package At 1.0 {
         $payload =~ tr[-_][+/];    # Replace Base64-URL characters with standard Base64
         decode_json decode_base64 $payload;
     }
+    sub session($s) { $s->{http}->session }
 
-    sub resumeSession( $s, %session ) {
-        my $access  = _decode_token $session{accessJwt};
-        my $refresh = _decode_token $session{refreshJwt};
-        my $session;
+    sub resumeSession( $s, %args ) {
+        my $access  = _decode_token $args{accessJwt};
+        my $refresh = _decode_token $args{refreshJwt};
         if ( time > $access->{exp} && time < $refresh->{exp} ) {
-
-            # Attempt to use refresh token which has a 90 day life span as of Jan. 2024
-            ( $session, my $headers )
-                = At::com::atproto::server::refreshSession( $s, headers => { Authorization => 'Bearer ' . $session{refreshJwt} } );
-            $session || return $session;
+            my ( $session, $headers ) = At::com::atproto::server::refreshSession( $s, headers => { Authorization => 'Bearer ' . $args{refreshJwt} } );
+            $s->{http}->_set_session($session);
+            return $session;
         }
-        else {
-            $session = \%session;
+        my ( $session, $headers ) = At::com::atproto::server::getSession( $s, headers => { Authorization => 'Bearer ' . $args{accessJwt} } );
+        if ($session) {
+            $session->{accessJwt}  = $args{accessJwt};
+            $session->{refreshJwt} = $args{refreshJwt};
+            $s->{http}->_set_session($session);
         }
-        $s->{http}->_set_session($session);
         $session;
     }
     #
@@ -113,31 +108,31 @@ package At 1.0 {
     }
 
     sub getTimeline ( $s, %args ) {
-        At::app::bsky::feed::getTimeline( $s, %args );
+        At::app::bsky::feed::getTimeline( $s, content => \%args );
     }
 
     sub getAuthorFeed ( $s, %args ) {
-        At::app::bsky::feed::getAuthorFeed( $s, %args );
+        At::app::bsky::feed::getAuthorFeed( $s, content => \%args );
     }
 
     sub getPostThread ( $s, %args ) {
-        At::app::bsky::feed::getPostThread( $s, %args );
+        At::app::bsky::feed::getPostThread( $s, content => \%args );
     }
 
     sub getPost ( $s, $uri ) {
-        At::app::bsky::feed::getPosts( $s, uris => [$uri] );
+        At::app::bsky::feed::getPosts( $s, content => { uris => [$uri] } );
     }
 
     sub getPosts ( $s, %args ) {
-        At::app::bsky::feed::getPosts( $s, %args );
+        At::app::bsky::feed::getPosts( $s, content => \%args );
     }
 
     sub getLikes ( $s, %args ) {
-        At::app::bsky::feed::getLikes( $s, %args );
+        At::app::bsky::feed::getLikes( $s, content => \%args );
     }
 
     sub getRepostedBy ( $s, %args ) {
-        At::app::bsky::feed::getRepostedBy( $s, %args );
+        At::app::bsky::feed::getRepostedBy( $s, content => \%args );
     }
 
     sub post ( $s, %args ) {
@@ -378,7 +373,8 @@ package At 1.0 {
                             $s->_ratecheck('global');
 
                             # ddx $schema;
-                            my ( $content, $headers ) = $s->{http}->get( $s->{service}->as_string . ( '/xrpc/' . $fqdn ), { content => \%args } );
+                            my ( $content, $headers )
+                                = $s->{http}->get( $s->{service}->as_string . ( '/xrpc/' . $fqdn ), { content => delete $args{content}, %args } );
 
                             #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
                             $s->ratelimit_( { map { $_ => $headers->{ 'ratelimit-' . $_ } } qw[limit remaining reset] }, 'global' );
@@ -596,11 +592,10 @@ package                        #
         };
 
     sub new( $class, $did ) {
-
-        #~ try {
-        #~ ensureValidDid($did);
-        #~ }
-        #~ catch ($err) { return; }
+        try {
+            ensureValidDid($did);
+        }
+        catch ($err) { return; }
         bless \$did, $class;
     }
 
@@ -1024,7 +1019,7 @@ package    #
         }, $class;
     }
 
-    sub get ( $s, $url, $req = () ) {
+    sub get ( $s, $url, $req //= {} ) {
         my $res
             = $s->{agent}
             ->get( $url . ( defined $req->{content} && keys %{ $req->{content} } ? '?' . $s->{agent}->www_form_urlencode( $req->{content} ) : '' ),
@@ -1037,7 +1032,7 @@ package    #
         wantarray ? ( $res->{content}, $res->{headers} ) : $res->{content};
     }
 
-    sub post ( $s, $url, $req //= () ) {
+    sub post ( $s, $url, $req //= {} ) {
         my $res = $s->{agent}->post(
             $url,
             {   defined $req->{headers} ? ( headers => $req->{headers} )                                                               : (),

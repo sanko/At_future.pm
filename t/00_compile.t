@@ -1,15 +1,14 @@
 use Test2::V0 '!subtest';
 use Test2::Util::Importer 'Test2::Tools::Subtest' => ( subtest_streamed => { -as => 'subtest' } );
 use Test2::Plugin::UTF8;
+use JSON::Tiny qw[decode_json];
+use Path::Tiny qw[path];
 use v5.36;
 
 # Dev
 # https://github.com/bluesky-social/atproto/blob/main/packages/api/tests/bsky-agent.test.ts
 use Data::Dump;
 use lib '../eg/', 'eg', '../lib', 'lib';
-
-# Public and totally worthless
-my %auth = ( identifier => 'atperl.bsky.social', password => 'ck2f-bqxl-h54l-xm3l' );
 #
 use if -d '../share',  At => -lexicons => '../share';
 use if !-d '../share', At => ();
@@ -35,8 +34,6 @@ subtest core => sub {
             'At::Lexicon::com::atproto::moderation::defs::reasonViolation()';
     };
 };
-
-#~ exit;
 #
 subtest 'should build the client' => sub {
     isa_ok $bsky = At->new( service => 'https://bsky.social' ), ['At'];
@@ -49,13 +46,27 @@ subtest 'client clones correctly' => sub {
     is $bsky->{session},  $bsky2->{session}, 'sessions match';
 };
 #
-SKIP: {
+SKIP:
+subtest live => sub {
     my $login;
-    subtest login => sub {
-        my $todo = todo 'Working with live services here. Things might not go as we expect or hope...';
-        ok $login = $bsky->login(%auth), 'logging in for the following tests';
+    my $auth;    # Public and totally worthless auth info
+    my $path = path(__FILE__)->sibling('test_auth.json')->realpath;
+    skip_all 'failed to locate auth data' unless $path->exists;
+    $auth = decode_json $path->slurp_utf8;
+    subtest auth => sub {
+        subtest resume => sub {
+            skip_all 'no session to resume' unless keys %{ $auth->{resume} };
+            my $todo = todo 'Working with live services here. Things might not go as we expect or hope...';
+            ok $login = $bsky->resumeSession( %{ $auth->{resume} } ), 'resume session for the following tests';
+        };
+        subtest login => sub {
+            skip_all 'resumed session; no login required' if keys %{ $auth->{resume} };
+            my $todo = todo 'Working with live services here. Things might not go as we expect or hope...';
+            ok $login = $bsky->login( %{ $auth->{login} } ), 'logging in for the following tests';
+        };
     };
-    #
+
+    # }
     subtest 'client clones correctly after login' => sub {
         $login || skip_all "$login";
         skip_all 'Clone is not installed' unless eval 'require Clone';
@@ -214,6 +225,6 @@ SKIP: {
             }, 'deletePost(...)';
         };
     }
-}
+};
 #
 done_testing;
