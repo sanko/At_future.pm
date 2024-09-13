@@ -241,19 +241,22 @@ package At 1.0 {
 
     # Actors
     sub getProfile ( $s, %args ) {
-        At::app::bsky::actor::getProfile( $s, %args );
+        At::app::bsky::actor::getProfile( $s, content => \%args );
     }
 
     sub upsertProfile ( $s, $fn ) {
         my $repo = $s->did;
         my $existing;
         for ( 0 .. 5 ) {    # Might take a few tries
-            $existing ||= At::com::atproto::repo::getRecord( $s, repo => $repo->as_string, collection => 'app.bsky.actor.profile', rkey => 'self' );
-            my %updated = $fn->( %{ $existing->{value} } );
+            $existing
+                ||= At::com::atproto::repo::getRecord( $s, content => { repo => $repo, collection => 'app.bsky.actor.profile', rkey => 'self' } );
+
+            #~ throw $existing unless $existing;
+            my %updated = $fn->( %{$existing} );
             my $okay    = At::com::atproto::repo::putRecord(
                 $s,
                 content => {
-                    repo       => $repo->as_string,
+                    repo       => $repo,
                     collection => 'app.bsky.actor.profile',
                     rkey       => 'self',
                     record     => { %updated, type => 'app.bsky.actor.profile' },
@@ -385,7 +388,7 @@ package At 1.0 {
                                 = $rate_category eq 'createSession' ? $args{identifier} : $rate_category eq 'updateHandle' ? $args{did} : ();
                             $s->_ratecheck( $rate_category, $_rate_meta );
                             my ( $content, $headers )
-                                = $s->{http}->post( $s->{service}->as_string . ( '/xrpc/' . $fqdn ), { content => delete $args{content}, %args } );
+                                = $s->{http}->post( $s->{service} . ( '/xrpc/' . $fqdn ), { content => delete $args{content}, %args } );
 
                             #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
                             $s->ratelimit_( { map { $_ => $headers->{ 'ratelimit-' . $_ } } qw[limit remaining reset] }, $rate_category,
@@ -404,7 +407,7 @@ package At 1.0 {
 
                             # ddx $schema;
                             my ( $content, $headers )
-                                = $s->{http}->get( $s->{service}->as_string . ( '/xrpc/' . $fqdn ), { content => delete $args{content}, %args } );
+                                = $s->{http}->get( $s->{service} . ( '/xrpc/' . $fqdn ), { content => delete $args{content}, %args } );
 
                             #~ https://docs.bsky.app/docs/advanced-guides/rate-limits
                             $s->ratelimit_( { map { $_ => $headers->{ 'ratelimit-' . $_ } } qw[limit remaining reset] }, 'global' );
@@ -418,7 +421,7 @@ package At 1.0 {
                         _set_capture( join( '.', $raw->{id}, ( $name eq 'main' ? () : $name ) ), $schema );
                     }
                     elsif ( $schema->{type} eq 'string' )       { _set_capture( $fqdn, $schema ); }
-                    elsif ( $schema->{type} eq 'subscription' ) { }
+                    elsif ( $schema->{type} eq 'subscription' ) { use Data::Dump; ddx $schema; }
                     elsif ( $schema->{type} eq 'token' ) {    # Generally just a string
                         my $namespace = $fqdn =~ s[[#\.]][::]gr;
                         my $package   = _namespace2package($fqdn);
@@ -496,6 +499,8 @@ package At 1.0 {
     sub _coerce ( $namespace, $schema, $data ) {
         $data // return ();
         return $coercions{ $schema->{type} }->( $namespace, $schema, $data ) if defined $coercions{ $schema->{type} };
+        use Data::Dump;
+        ddx $schema;
         die 'Unknown coercion: ' . $schema->{type};
     }
 }

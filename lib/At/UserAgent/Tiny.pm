@@ -3,7 +3,7 @@ package At::UserAgent::Tiny 1.0 {
     use parent -norequire, 'At::UserAgent';
     use HTTP::Tiny;
     use JSON::Tiny qw[decode_json encode_json];
-    use warnings::register;
+    use At::Error  qw[register];
     no warnings qw[experimental::builtin];
     #
     sub new ( $class, %args ) {
@@ -26,7 +26,7 @@ package At::UserAgent::Tiny 1.0 {
             ->get( $url . ( defined $req->{content} && keys %{ $req->{content} } ? '?' . $s->{agent}->www_form_urlencode( $req->{content} ) : '' ),
             { defined $req->{headers} ? ( headers => $req->{headers} ) : () } );
         if ( !$res->{success} ) {
-            my $err = At::Error->new( decode_json $res->{content} );
+            my $err = HTTPError( decode_json( $res->{content} )->{message} );
             return wantarray ? ( $err, $res->{headers} ) : $err;
         }
         $res->{content} = decode_json $res->{content} if $res->{content} && $res->{headers}{'content-type'} =~ m[application/json];
@@ -44,7 +44,7 @@ package At::UserAgent::Tiny 1.0 {
             }
         );
         if ( !$res->{success} ) {
-            my $err = At::Error->new( decode_json $res->{content} );
+            my $err = HTTPError( decode_json( $res->{content} )->{message} );
             return wantarray ? ( $err, $res->{headers} ) : $err;
         }
         $res->{content} = decode_json $res->{content} if $res->{content} && $res->{headers}{'content-type'} =~ m[application/json];
@@ -72,6 +72,7 @@ package At::UserAgent::Tiny 1.0 {
     sub ratelimit($s) {
         $s->{ratelimit} // ();
     }
+    register 'HTTPError';
 }
 1;
 __END__

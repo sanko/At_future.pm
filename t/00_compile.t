@@ -19,7 +19,9 @@ my $bsky;
 
 # Utils
 sub getProfileDisplayName () {
-    $bsky->getProfile( actor => $bsky->did, rkey => 'self' )->{displayName} // ();
+    my $h = $bsky->getProfile( actor => $bsky->did, rkey => 'self' );
+    $h->throw unless $h;
+    $h->{displayName} // ();
 }
 subtest core => sub {
     subtest 'verify object' => sub {
@@ -58,9 +60,12 @@ subtest live => sub {    # Public and totally worthless auth info
             ok $login = $bsky->resumeSession( %{ $auth->{resume} } ), 'resume session for the following tests';
         };
         subtest login => sub {
-            skip_all 'resumed session; no login required' if keys %{ $auth->{resume} };
+            skip_all 'resumed session; no login required' if $login;
+            skip_all 'no auth info found' unless keys %{ $auth->{login} };
             my $todo = todo 'Working with live services here. Things might not go as we expect or hope...';
             ok $login = $bsky->login( %{ $auth->{login} } ), 'logging in for the following tests';
+
+            #~ ddx $bsky->session;
         };
     };
 
