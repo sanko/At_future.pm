@@ -43,7 +43,7 @@ Expected parameters include:
 
 ## `did( )`
 
-Gather the DID of the current user. Returns c&lt;undef> if the client is not authenticated.
+Gather the DID of the current user. Returns `undef` if the client is not authenticated.
 
 ```
 warn $bsky->did;

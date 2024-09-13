@@ -882,7 +882,7 @@ L<https://www.iana.org/assignments/language-subtag-registry/language-subtag-regi
 
 =head2 C<did( )>
 
-Gather the DID of the current user. Returns c<undef> if the client is not authenticated.
+Gather the DID of the current user. Returns C<undef> if the client is not authenticated.
 
     warn $bsky->did;
 
