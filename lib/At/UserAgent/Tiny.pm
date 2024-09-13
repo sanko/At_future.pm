@@ -56,8 +56,9 @@ package At::UserAgent::Tiny 1.0 {
     sub websocket ( $s, $url, $req = () ) {...}
 
     sub _set_session ( $s, $session ) {
+        $session || return;
         $s->{session} = $session;
-        $s->_set_bearer_token( 'Bearer ' . $s->{session}{accessJwt} );
+        $s->_set_bearer_token( 'Bearer ' . $session->{accessJwt} );
     }
 
     sub session ($s) {
