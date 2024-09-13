@@ -1,11 +1,9 @@
 package At::Protocol::Handle 1.0 {
     use v5.38;
-    use Carp      qw[carp confess];
     use At::Error qw[register throw];
     use parent -norequire => 'Exporter';
-    use URI;
     use feature 'try';
-    no warnings qw[experimental::builtin experimental::try];
+    no warnings qw[experimental::try];
     use overload
         '""' => sub ( $s, $u, $q ) {
         $$s;
@@ -42,7 +40,8 @@ package At::Protocol::Handle 1.0 {
         ensureValidHandleRegex($id);
         CORE::state $warned //= 0;
         if ( $id =~ /\.(test)$/ && !$warned ) {
-            carp 'development or testing TLD used in handle: ' . $id;
+            require Carp;
+            Carp::carp 'development or testing TLD used in handle: ' . $id;
             $warned = 1;
         }
         bless \$id, $class;
@@ -108,8 +107,8 @@ package At::Protocol::Handle 1.0 {
         try {
             ensureValidHandle($handle)
         }
-        catch ($err) {    # TODO: I want this to work but this is perl...
-            if ( $err->isa('InvalidHandleError') ) {
+        catch ($err) {    # TODO: I want this to work by checking the type of thrown error but this is perl...
+            if ( $err =~ /Handle/ ) {
                 return 0;
             }
             die $err;
@@ -135,7 +134,7 @@ __END__
 
 =head1 NAME
 
-At::Protocol::Handle - Throwable Errors
+At::Protocol::Handle - AT Protocol Handle Validation
 
 =head1 SYNOPSIS
 

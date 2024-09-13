@@ -13,6 +13,7 @@ package At 1.0 {
     use URI;
     #
     use At::Error;
+    use At::Protocol::DID;
     use At::Protocol::Handle;
     #
     use Data::Dump;
@@ -497,70 +498,6 @@ package At 1.0 {
         die 'Unknown coercion: ' . $schema->{type};
     }
 }
-package                        #
-    At::Protocol::DID 1.0 {    # https://atproto.com/specs/did
-    use v5.38;
-    use Carp qw[carp confess];
-    no warnings qw[experimental::builtin experimental::try];
-    use feature 'try';
-    use overload
-        '""' => sub ( $s, $u, $q ) {
-        $s->as_string;
-        };
-
-    sub new( $class, $did ) {
-        try {
-            ensureValidDid($did);
-        }
-        catch ($err) { return; }
-        bless \$did, $class;
-    }
-
-    sub as_string($s) {
-        $$s;
-    }
-
-    #~ Taken from https://github.com/bluesky-social/atproto/blob/main/packages/syntax/src/did.ts
-    #~ Human-readable constraints:
-    #~   - valid W3C DID (https://www.w3.org/TR/did-core/#did-syntax)
-    #~      - entire URI is ASCII: [a-zA-Z0-9._:%-]
-    #~      - always starts "did:" (lower-case)
-    #~      - method name is one or more lower-case letters, followed by ":"
-    #~      - remaining identifier can have any of the above chars, but can not end in ":"
-    #~      - it seems that a bunch of ":" can be included, and don't need spaces between
-    #~      - "%" is used only for "percent encoding" and must be followed by two hex characters (and thus can't end in "%")
-    #~      - query ("?") and fragment ("#") stuff is defined for "DID URIs", but not as part of identifier itself
-    #~      - "The current specification does not take a position on the maximum length of a DID"
-    #~   - in current atproto, only allowing did:plc and did:web. But not *forcing* this at lexicon layer
-    #~   - hard length limit of 8KBytes
-    #~   - not going to validate "percent encoding" here
-    sub ensureValidDid ($did) {
-
-        # check that all chars are boring ASCII
-        confess 'Disallowed characters in DID (ASCII letters, digits, and a couple other characters only)' unless $did =~ /^[a-zA-Z0-9._:%-]*$/;
-        #
-        my @parts = split ':', $did, -1;    # negative limit, ftw
-        confess 'DID requires prefix, method, and method-specific content' if @parts < 3;
-        #
-        confess 'DID requires "did:" prefix' if $parts[0] ne 'did';
-        #
-        confess 'DID method must be lower-case letters' if $parts[1] !~ /^[a-z]+$/;
-        #
-        confess 'DID can not end with ":" or "%"'       if $did =~ /[:%]$/;
-        confess 'DID is too long (2048 characters max)' if length $did > 2 * 1024;
-        1;
-    }
-
-    sub ensureValidDidRegex ($did) {
-
-        #~ simple regex to enforce most constraints via just regex and length.
-        #~ hand wrote this regex based on above constraints
-        confess q[DID didn't validate via regex]        if $did !~ /^did:[a-z]+:[a-zA-Z0-9._:%-]*[a-zA-Z0-9._-]$/;
-        confess 'DID is too long (2048 characters max)' if length $did > 2 * 1024;
-        #
-        1;
-    }
-    };
 package    #
     At::Protocol::URI::_query 1.0 {
     use v5.38;

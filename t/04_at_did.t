@@ -5,20 +5,21 @@ use Path::Tiny qw[path];
 use v5.36;
 use lib '../eg/', 'eg', '../lib', 'lib';
 #
-use if -d '../share',  At => -lexicons => '../share';
-use if !-d '../share', At => ();
+use At::Protocol::DID qw[:all];
+#
+imported_ok qw[ensureValidDid ensureValidDidRegex];
 #
 sub expectValid($uri) {
     subtest $uri => sub {
-        ok At::Protocol::DID::ensureValidDid($uri),      'ensureValidDid( ... )';
-        ok At::Protocol::DID::ensureValidDidRegex($uri), 'ensureValidDidRegex( ... )';
+        ok ensureValidDid($uri),      'ensureValidDid( ... )';
+        ok ensureValidDidRegex($uri), 'ensureValidDidRegex( ... )';
     }
 }
 
 sub expectInvalid($uri) {
     subtest $uri => sub {
-        ok dies { At::Protocol::DID::ensureValidDid($uri) },        'ensureValidDid( ... ) dies';
-        ok dies { At::Protocol::DID::ensureValidAtDidRegex($uri) }, 'ensureValidAtDidRegex( ... ) dies';
+        ok dies { ensureValidDid($uri) },        'ensureValidDid( ... ) dies';
+        ok dies { ensureValidAtDidRegex($uri) }, 'ensureValidAtDidRegex( ... ) dies';
     }
 }
 subtest 'enforces spec details' => sub {

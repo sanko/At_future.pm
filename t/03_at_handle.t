@@ -38,8 +38,7 @@ subtest 'old At.pm' => sub {
 
     # Valid but only during testing and development
     subtest 'warning level restricted TDL' => sub {    # Note: only thrown once!
-        like( warning { At::Protocol::Handle->new($_) }, qr/testing TLD used in handle/, $_ ) for qw[
-            nice.test];
+        like( warning { At::Protocol::Handle->new($_) }, qr/testing TLD used in handle/, $_ ) for qw[nice.test];
     };
 
     # All examples are taken directly from the DID docs found at https://atproto.com/specs/handle#identifier-examples
