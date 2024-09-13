@@ -80,7 +80,6 @@ At::Protocol::DID - AT Protocol DID Validation
         ...; # do something about it
     }
 
-
 =head1 DESCRIPTION
 
 The AT Protocol uses L<Decentralized Identifiers|https://en.wikipedia.org/wiki/Decentralized_identifier> (DIDs) as

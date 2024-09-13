@@ -15,6 +15,7 @@ package At 1.0 {
     use At::Error;
     use At::Protocol::DID;
     use At::Protocol::Handle;
+    use At::Protocol::NSID;
     #
     use Data::Dump;
     #
@@ -558,91 +559,6 @@ package    #
 
     sub as_string( $s, $sep //= '&' ) {
         join $sep, map { join '=', uri_escape_utf8( $_->[0] ), uri_escape_utf8( $_->[1] ) } @$s;
-    }
-    };
-package    # https://github.com/bluesky-social/atproto/blob/main/packages/syntax/src/nsid.ts
-    At::Protocol::NSID 1.0 {
-    use v5.38;
-    no warnings qw[experimental::builtin experimental::try];
-    use Carp qw[carp confess];
-    use feature 'try';
-    use overload
-        '""' => sub ( $s, $u, $q ) {
-        $s->as_string;
-        };
-
-#~ Grammar:
-#~  alpha     = "a" / "b" / "c" / "d" / "e" / "f" / "g" / "h" / "i" / "j" / "k" / "l" / "m" / "n" / "o" / "p" / "q" / "r" / "s" / "t" / "u" / "v" / "w" / "x" / "y" / "z" / "A" / "B" / "C" / "D" / "E" / "F" / "G" / "H" / "I" / "J" / "K" / "L" / "M" / "N" / "O" / "P" / "Q" / "R" / "S" / "T" / "U" / "V" / "W" / "X" / "Y" / "Z"
-#~  number    = "1" / "2" / "3" / "4" / "5" / "6" / "7" / "8" / "9" / "0"
-#~  delim     = "."
-#~  segment   = alpha *( alpha / number / "-" )
-#~  authority = segment *( delim segment )
-#~  name      = alpha *( alpha )
-#~  nsid      = authority delim name
-    sub new( $class, $nsid ) {
-        ensureValidNsid($nsid);
-        bless [ split /\./, $nsid, -1 ], $class;
-    }
-
-    sub parse($nsid) {
-        __PACKAGE__->new($nsid);
-    }
-
-    sub create( $authority, $name ) {
-        parse join '.', reverse( split( /\./, $authority, -1 ) ), $name;
-    }
-    sub authority($s) { join '.', reverse splice( @$s, 0, -1 ); }
-
-    sub name($s) {
-        @$s[-1];
-    }
-
-    sub as_string($s) {
-        join '.', @$s;
-    }
-
-    sub isValid($nsid) {
-        try {
-            parse($nsid);
-            return 1;
-        }
-        catch ($err) { return 0; }
-    }
-
-    #~ Human readable constraints on NSID:
-    #~  - a valid domain in reversed notation
-    #~  - followed by an additional period-separated name, which is camel-case letters
-    sub ensureValidNsid($nsid) {
-
-        # check that all chars are boring ASCII
-        confess 'Disallowed characters in NSID (ASCII letters, digits, dashes, periods only)' unless $nsid =~ /^[a-zA-Z0-9.-]*$/;
-        #
-        confess 'NSID is too long (317 chars max)' if length $nsid > 253 + 1 + 63;
-        my @labels = split /\./, $nsid, -1;    # negative length, ftw
-
-        #
-        confess 'NSID needs at least three parts' if scalar @labels < 3;
-        #
-        for my $i ( 0 .. $#labels ) {
-            my $l = $labels[$i];
-            confess 'NSID parts can not be empty' unless length $l;
-            confess 'NSID part too long (max 63 chars)'           if length $l > 63;
-            confess 'NSID parts can not start or end with hyphen' if $l =~ /^-|-$/;
-            confess 'NSID first part may not start with a digit'  if $i == 0        && $l =~ /^[0-9]/;
-            confess 'NSID name part must be only letters'         if $i == $#labels && $l !~ /^[a-zA-Z]+$/;
-        }
-        1;
-    }
-
-    sub ensureValidNsidRegex ($nsid) {
-
-        #~ simple regex to enforce most constraints via just regex and length.
-        #~ hand wrote this regex based on above constraints
-        confess q[NSID didn't validate via regex]
-            unless $nsid
-            =~ /^[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+(\.[a-zA-Z]([a-zA-Z]{0,61}[a-zA-Z])?)$/;
-        confess 'NSID is too long (317 chars max)' if length $nsid > 253 + 1 + 63;
-        1;
     }
     };
 package                        # https://atproto.com/specs/at-uri-scheme

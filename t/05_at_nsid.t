@@ -5,32 +5,38 @@ use Path::Tiny qw[path];
 use v5.36;
 use lib '../eg/', 'eg', '../lib', 'lib';
 #
-use if -d '../share',  At => -lexicons => '../share';
-use if !-d '../share', At => ();
+use At::Protocol::NSID qw[:all];
+#
+imported_ok qw[
+    parse create
+    isValid
+    ensureValidNsid ensureValidNsidRegex
+];
+#
 #
 subtest 'NSID parsing & creation' => sub {
     subtest 'parses valid NSIDs' => sub {
         subtest 'com.example.foo' => sub {
-            is At::Protocol::NSID::parse('com.example.foo')->authority, 'example.com',     '->authority';
-            is At::Protocol::NSID::parse('com.example.foo')->name,      'foo',             '->name';
-            is At::Protocol::NSID::parse('com.example.foo')->as_string, 'com.example.foo', '->as_string';
+            is parse('com.example.foo')->authority, 'example.com',     '->authority';
+            is parse('com.example.foo')->name,      'foo',             '->name';
+            is parse('com.example.foo'),            'com.example.foo', 'stringify';
         };
         subtest 'com.long-thing1.cool.fooBarBaz' => sub {
-            is At::Protocol::NSID::parse('com.long-thing1.cool.fooBarBaz')->authority, 'cool.long-thing1.com',           '->authority';
-            is At::Protocol::NSID::parse('com.long-thing1.cool.fooBarBaz')->name,      'fooBarBaz',                      '->name';
-            is At::Protocol::NSID::parse('com.long-thing1.cool.fooBarBaz')->as_string, 'com.long-thing1.cool.fooBarBaz', '->as_string';
+            is parse('com.long-thing1.cool.fooBarBaz')->authority, 'cool.long-thing1.com',           '->authority';
+            is parse('com.long-thing1.cool.fooBarBaz')->name,      'fooBarBaz',                      '->name';
+            is parse('com.long-thing1.cool.fooBarBaz'),            'com.long-thing1.cool.fooBarBaz', 'stringify';
         }
     };
     subtest 'creates valid NSIDs' => sub {
         subtest q[::create('example.com', 'foo')] => sub {
-            is At::Protocol::NSID::create( 'example.com', 'foo' )->authority, 'example.com',     '->authority';
-            is At::Protocol::NSID::create( 'example.com', 'foo' )->name,      'foo',             '->name';
-            is At::Protocol::NSID::create( 'example.com', 'foo' )->as_string, 'com.example.foo', '->as_string';
+            is create( 'example.com', 'foo' )->authority, 'example.com',     '->authority';
+            is create( 'example.com', 'foo' )->name,      'foo',             '->name';
+            is create( 'example.com', 'foo' ),            'com.example.foo', 'stringify';
         };
         subtest q[::create('cool.long-thing1.com', 'fooBarBaz')] => sub {
-            is At::Protocol::NSID::create( 'cool.long-thing1.com', 'fooBarBaz' )->authority, 'cool.long-thing1.com',           '->authority';
-            is At::Protocol::NSID::create( 'cool.long-thing1.com', 'fooBarBaz' )->name,      'fooBarBaz',                      '->name';
-            is At::Protocol::NSID::create( 'cool.long-thing1.com', 'fooBarBaz' )->as_string, 'com.long-thing1.cool.fooBarBaz', '->as_string';
+            is create( 'cool.long-thing1.com', 'fooBarBaz' )->authority, 'cool.long-thing1.com',           '->authority';
+            is create( 'cool.long-thing1.com', 'fooBarBaz' )->name,      'fooBarBaz',                      '->name';
+            is create( 'cool.long-thing1.com', 'fooBarBaz' ),            'com.long-thing1.cool.fooBarBaz', 'stringify';
         };
     };
 };
@@ -39,15 +45,15 @@ subtest 'NSID validation' => sub {
 
     sub expectValid($uri) {
         subtest $uri => sub {
-            ok At::Protocol::NSID::ensureValidNsid($uri),      'ensureValidNsid( ... )';
-            ok At::Protocol::NSID::ensureValidNsidRegex($uri), 'ensureValidNsidRegex( ... )';
+            ok ensureValidNsid($uri),      'ensureValidNsid( ... )';
+            ok ensureValidNsidRegex($uri), 'ensureValidNsidRegex( ... )';
         }
     }
 
     sub expectInvalid($uri) {
         subtest $uri => sub {
-            ok dies { At::Protocol::NSID::ensureValidNsid($uri) },      'ensureValidNsid( ... ) dies';
-            ok dies { At::Protocol::NSID::ensureValidNsidRegex($uri) }, 'ensureValidNsidRegex( ... ) dies';
+            ok dies { ensureValidNsid($uri) },      'ensureValidNsid( ... ) dies';
+            ok dies { ensureValidNsidRegex($uri) }, 'ensureValidNsidRegex( ... ) dies';
         }
     }
     #
