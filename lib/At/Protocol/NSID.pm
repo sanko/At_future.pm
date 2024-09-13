@@ -165,9 +165,6 @@ Validates an NSID. Throws errors on failure and returns a true value on success.
 Validates an NSID with cursory regex provided by the AT protocol designers. Throws errors on failure and returns a true
 value on success.
 
-
-
-
 =head1 See Also
 
 L<https://atproto.com/specs/nsid>
