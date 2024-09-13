@@ -28,8 +28,8 @@ package At::Error 1.0 {
     sub register($class) {
         my ($from) = caller;
         no strict 'refs';
-        *{ $from . '::' . $class } = sub ( $message, $description //= () ) { ( __PACKAGE__ . '::_' . $class )->new( $message, $description ) };
-        push @{ __PACKAGE__ . '::_' . $class . '::ISA' }, __PACKAGE__;
+        *{ $from . '::' . $class } = sub ( $message, $description //= () ) { ($class)->new( $message, $description ) };
+        push @{ $class . '::ISA' }, __PACKAGE__;
     }
 }
 1;

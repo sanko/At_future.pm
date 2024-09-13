@@ -5,8 +5,12 @@ use Path::Tiny qw[path];
 use v5.36;
 use lib '../eg/', 'eg', '../lib', 'lib';
 #
-use if -d '../share',  At => -lexicons => '../share';
-use if !-d '../share', At => ();
+use At::Protocol::Handle qw[:all];
+#
+imported_ok qw[
+    ensureValidHandle ensureValidHandleRegex
+    normalizeHandle   normalizeAndEnsureValidHandle
+    isValidHandle     isValidTld];
 #
 subtest 'old At.pm' => sub {
 
@@ -54,15 +58,15 @@ subtest 'AT Handle validation' => sub {
 
     sub expectValid($handle) {
         subtest $handle => sub {
-            ok At::Protocol::Handle::ensureValidHandle($handle),      'ensureValidHandle( ... )';
-            ok At::Protocol::Handle::ensureValidHandleRegex($handle), 'ensureValidHandleRegex( ... )';
+            ok ensureValidHandle($handle),      'ensureValidHandle( ... )';
+            ok ensureValidHandleRegex($handle), 'ensureValidHandleRegex( ... )';
         }
     }
 
     sub expectInvalid($handle) {
         subtest $handle => sub {
-            ok dies { At::Protocol::Handle::ensureValidHandle($handle) },      'ensureValidHandle( ... ) dies';
-            ok dies { At::Protocol::Handle::ensureValidHandleRegex($handle) }, 'ensureValidHandleRegex( ... ) dies';
+            ok dies { ensureValidHandle($handle) },      'ensureValidHandle( ... ) dies';
+            ok dies { ensureValidHandleRegex($handle) }, 'ensureValidHandleRegex( ... ) dies';
         }
     }
     subtest 'allows valid handles' => sub {
@@ -234,7 +238,7 @@ subtest 'AT Handle validation' => sub {
     };
 };
 subtest normalization => sub {
-    is At::Protocol::Handle::normalizeAndEnsureValidHandle('JoHn.TeST'), 'john.test', q[normalize 'JoHn.TeST'];
+    is normalizeAndEnsureValidHandle('JoHn.TeST'), 'john.test', q[normalize 'JoHn.TeST'];
     ok dies {
         normalizeAndEnsureValidHandle('JoH!n.TeST')
     }, q[throws on invalid normalized handle 'JoH!n.TeST'];

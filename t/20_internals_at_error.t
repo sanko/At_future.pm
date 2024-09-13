@@ -9,7 +9,7 @@ use if !-d '../share', At => ();
 use At::Error;
 #
 ok At::Error::register('AtTest'), 'register new "AtTest" error category';
-isa_ok my $err = AtTest('Bad things happened'), [ 'At::Error', 'At::Error::_AtTest' ], 'AtTest(...) creates new error object';
+isa_ok my $err = AtTest('Bad things happened'), [ 'At::Error', 'AtTest' ], 'AtTest(...) creates new error object';
 ok !$err, 'errors are false';
 like dies { throw $err }, qr[Bad things happened], 'throws and prints stacktrace';
 #
