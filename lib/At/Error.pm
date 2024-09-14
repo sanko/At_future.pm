@@ -25,7 +25,7 @@ package At::Error 1.0 {
             map { sprintf q[%s called at %s line %d], $_->{sub_name}, $_->{file}, $_->{line} } @{ $s->[3] };
     }
 
-    sub register($class) {
+    sub register( $class, $description //= () ) {
         my ($from) = caller;
         no strict 'refs';
         *{ $from . '::' . $class } = sub ( $message, $description //= () ) { ($class)->new( $message, $description ) };

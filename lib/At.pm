@@ -380,6 +380,7 @@ package At 1.0 {
                     elsif ( $schema->{type} eq 'procedure' ) {
                         my @namespace = split /\./, $fqdn;
                         no strict 'refs';
+                        register( $_->{name}, $_->{description} // '' ) for grep { !__PACKAGE__->can( $_->{name} ) } @{ $schema->{errors} };
                         my $rate_category
                             = $namespace[-1] =~ m[^(updateHandle|createAccount|createSession|deleteAccount|resetPassword)$] ? $namespace[-1] :
                             'global';
@@ -402,6 +403,7 @@ package At 1.0 {
                     elsif ( $schema->{type} eq 'query' ) {
                         my @namespace = split /\./, $fqdn;
                         no strict 'refs';
+                        register( $_->{name}, $_->{description} // '' ) for grep { !__PACKAGE__->can( $_->{name} ) } @{ $schema->{errors} };
                         *{ join '::', 'At', @namespace } = sub ( $s, %args ) {
                             $s->_ratecheck('global');
 
