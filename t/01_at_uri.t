@@ -5,10 +5,11 @@ use Path::Tiny qw[path];
 use v5.36;
 use lib '../eg/', 'eg', '../lib', 'lib';
 #
-use if -d '../share',  At => -lexicons => '../share';
-use if !-d '../share', At => ();
+use At::Protocol::URI qw[:all];
 #
-subtest 'At::Protocol::URI::_query' => sub {
+imported_ok qw[ensureValidAtUri ensureValidAtUriRegex];
+#
+subtest 'test At::Protocol::URI::_query' => sub {
     isa_ok my $query = At::Protocol::URI::_query->new('?foo=bar&foo=baz'), ['At::Protocol::URI::_query'], '?foo=bar&foo=baz';
     is $query->as_string, 'foo=bar&foo=baz', '->as_string';
     ok $query->add_param( foo => 'qux' ), q[add_param(foo => 'qux')];
@@ -243,17 +244,18 @@ subtest 'AT URI validation' => sub {
 
     sub expectValid($uri) {
         subtest $uri => sub {
-            ok At::Protocol::URI::ensureValidAtUri($uri),      'ensureValidAtUri( ... )';
-            ok At::Protocol::URI::ensureValidAtUriRegex($uri), 'ensureValidAtUriRegex( ... )';
+            ok ensureValidAtUri($uri),      'ensureValidAtUri( ... )';
+            ok ensureValidAtUriRegex($uri), 'ensureValidAtUriRegex( ... )';
         }
     }
 
     sub expectInvalid($uri) {
         subtest $uri => sub {
-            ok dies { At::Protocol::URI::ensureValidAtUri($uri) }, 'ensureValidAtUri( ... ) dies';
-            ok dies { At::Protocol::URI::ensureValidAtUri($uri) }, 'ensureValidAtUriRegex( ... ) dies';
+            ok dies { ensureValidAtUri($uri) },      'ensureValidAtUri( ... ) dies';
+            ok dies { ensureValidAtUriRegex($uri) }, 'ensureValidAtUriRegex( ... ) dies';
         }
     }
+    #
     subtest 'enfore spec basics' => sub {
         expectValid('at://did:plc:asdf123');
         expectValid('at://user.bsky.social');

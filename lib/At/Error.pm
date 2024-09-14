@@ -21,7 +21,7 @@ package At::Error 1.0 {
     sub throw($s) {
         my ( undef, $file, $line ) = caller();
         ++$s->[2];    # Interesting. Maybe.
-        die join "\n\t", sprintf( q[%s at %s line %d], $s->[0], $file, $line ),
+        die join "\n\t", sprintf( qq[%s at %s line %d\n], $s->[0], $file, $line ),
             map { sprintf q[%s called at %s line %d], $_->{sub_name}, $_->{file}, $_->{line} } @{ $s->[3] };
     }
 
