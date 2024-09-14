@@ -1,6 +1,4 @@
-package At::Protocol::URI 1.0 {    # https://atproto.com/specs/at-uri-scheme
-
-    # https://github.com/bluesky-social/atproto/blob/main/packages/syntax/src/aturi.ts
+package At::Protocol::URI 1.0 {    # https://github.com/bluesky-social/atproto/blob/main/packages/syntax/src/aturi.ts
     use v5.38;
     no warnings qw[experimental::builtin experimental::try];
     use At::Error            qw[register throw];
@@ -65,8 +63,8 @@ package At::Protocol::URI 1.0 {    # https://atproto.com/specs/at-uri-scheme
         join '', grep {defined} $s->origin, $path, $qs, $hash;
     }
 
-    sub make ( $handle_r_did, $collection //= (), $rkey //= () ) {
-        At->new( join '/', grep {defined} $handle_r_did, $collection, $rkey );
+    sub create ( $handle_r_did, $collection //= (), $rkey //= () ) {
+        At::Protocol::URI->new( join '/', grep {defined} $handle_r_did, $collection, $rkey );
     }
     sub protocol ($s)             {'at:'}
     sub origin($s)                { $s->protocol . '//' . $s->host }
@@ -272,10 +270,9 @@ At::Protocol::URI - AT Protocol URI Validation
 
 =head1 DESCRIPTION
 
-Namespaced Identifiers (NSIDs) are used to reference Lexicon schemas for records, XRPC endpoints, and more.
-
-The basic structure and semantics of an NSID are a fully-qualified hostname in Reverse Domain-Name Order, followed by a
-simple name. The hostname part is the B<domain authority>, and the final segment is the B<name>.
+The AT URI scheme (C<at://>) makes it easy to reference individual records in a specific repository, identified by
+either DID or handle. AT URIs can also be used to reference a collection within a repository, or an entire repository
+(aka, an identity).
 
 This package aims to validate them.
 
@@ -285,58 +282,109 @@ You may import functions by name or with the C<:all> tag.
 
 =head2 C<new( ... )>
 
-Verifies an NSID and creates a new object containing it.
+Verifies an AT-uri and creates a new object containing it.
 
-    my $nsid = At::Protocol::NSID->new( 'com.example.fooBar' );
+    my $uri = At::Protocol::URI->new( 'at://did:plc:44ybard66vv44zksje25o7dz/app.bsky.feed.post/3jwdwj2ctlk26' );
 
-On success, an object is returned that will stringify to the NSID itself.
-
-=head2 C<parse( ... )>
-
-    my $nsid = parse( 'com.example.fooBar' );
-
-Wrapper around C<new(...)> for the sake of compatibility.
+On success, an object is returned that will stringify to the URI itself.
 
 =head2 C<create( ... )>
 
-    my $nsid = create( 'alex.example.com' );
+    my $uri_1 = create('did:plc:44ybard66vv44zksje25o7dz');
+    my $uri_2 = create('did:plc:44ybard66vv44zksje25o7dz', 'app.bsky.feed.post', '3jwdwj2ctlk26');
+    my $uri_3 = create('bnewbold.bsky.team', 'app.bsky.feed.post', '3jwdwj2ctlk26');
 
-Parses a 'normal' (sub)domain name and creates an NSID object.
+Allows you to build a new URI from parts.
 
-=head2 C<authority( )>
+Expected parameters include:
 
-    my $auth = $nsid->authority;
+=over
 
-Returns the domain authority of the NSID.
+=item C<host> - required
 
-=head2 C<name( )>
+This is either a L<DID|At::Protocol::DID> or L<handle|At::Protocol::Handle>.
 
-    my $name = $nsid->name;
+=item C<collection>
 
-Returns the name from the NSID.
+=item C<rkey>
 
-=head2 C<isValid( ... )>
+=back
 
-    my $ok = isValid( 'com.exa💩ple.thing' );
+A new object is returned on success.
 
-Returns a boolean value indicating whether the given NSID is valid and can be parsed.
+=head2 C<protocol( )>
 
-=head2 C<ensureValidNsid( ... )>
+    my $prot = $uri->protocol;
 
-    ensureValidNsid( '.com.example.wrong' );
+Returns the URI's protocol. This is always C<at:>.
 
-Validates an NSID. Throws errors on failure and returns a true value on success.
+=head2 C<origin( )>
 
-=head2 C<ensureValidNsidRegex( ... )>
+    my $base = $uri->origin;
 
-    ensureValidNsidRegex( 'com.example.right' );
+Returns the protocol and host.
 
-Validates an NSID with cursory regex provided by the AT protocol designers. Throws errors on failure and returns a true
-value on success.
+=head2 C<host( [...] )>
+
+    my $host = $uri->host;
+    $uri->host('did:plc:...');
+
+Mutator around the host.
+
+=head2 C<pathname( [...] )>
+
+    my $path = $uri->pathname;
+    $uri->pathname( '/foo' );
+
+Mutator around the url path.
+
+=head2 C<search( [...] )>
+
+    my $search = $uri->search;
+    $uri->search( '?foo=bar' );
+
+Mutator around the URI's search parameters.
+
+=head2 C<hash( [...] )>
+
+    my $hash = $uri->hash;
+    $uri->hash('hash');
+
+Mutator around the URI's hash field.
+
+When a I<strong> reference to another record is required, best practice is to use a CID hash in addition to the AT URI.
+
+=head2 C<collection( [...] )>
+
+    my $collection = $uri->collection;
+    $uri->collection( 'app.bsky.feed.post' );
+
+Mutator around the optional collection part of the path which must be a normalized L<NSID|At::Protocol::NSID>.
+
+=head2 C<rkey( [...] )>
+
+    my $rkey = $uri->rkey;
+    $uri->rkey( '3jzfcijpj2z2a' );
+
+Mutator around the optional rkey of the path which must be a valid 'L<Record Key|https://atproto.com/specs/record-key>'
+according to the AT Protocol spec.
+
+=head2 C<ensureValidAtUri( ... )>
+
+    ensureValidAtUri( 'at://did:plc:asdf123' );
+
+Validates an AT URI. Throws errors on failure and returns a true value on success.
+
+=head2 C<ensureValidAtUriRegex( ... )>
+
+    ensureValidAtUriRegex( 'a://did:plc:asdf123' ); # fatal
+
+Validates an AT URI with cursory regex provided by the AT protocol designers. Throws errors on failure and returns a
+true value on success.
 
 =head1 See Also
 
-L<https://atproto.com/specs/nsid>
+L<https://atproto.com/specs/at-uri-scheme>
 
 =head1 LICENSE
 
@@ -351,7 +399,7 @@ Sanko Robinson E<lt>sanko@cpan.orgE<gt>
 
 =begin stopwords
 
-atproto
+atproto rkey
 
 =end stopwords
 
