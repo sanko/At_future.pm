@@ -8,7 +8,7 @@ At - The AT Protocol for Social Networking
 ```perl
 use At;
 my $bsky = At->new( service => 'https://bsky.social' );
-# To be continued...
+$bsky->post( text => 'Hi.' );
 ```
 
 # DESCRIPTION
@@ -43,7 +43,7 @@ Expected parameters include:
 
 ## `did( )`
 
-Gather the DID of the current user. Returns `undef` if the client is not authenticated.
+Gather the DID of the current user. Returns `undef` on failure or if the client is not authenticated.
 
 ```
 warn $bsky->did;
@@ -51,24 +51,22 @@ warn $bsky->did;
 
 # Session Management
 
-You'll need an authenticated session for most API calls.
-
-There are two ways to manage sessions:
+You'll need an authenticated session for most API calls. There are two ways to manage sessions:
 
 - 1. Username/password based (deprecated)
 - 2. OAuth based
 
 Developers of new code should be aware that the AT protocol will be [transitioning to OAuth in over the next year or
-so (2024-2025)](https://github.com/bluesky-social/atproto/discussions/2656).
+so (2024-2025)](https://github.com/bluesky-social/atproto/discussions/2656) and this distribution will comply with this
+change.
 
 ## App password based session management
 
 Please note that this auth method is deprecated in favor of OAuth based session management. It is recommended to use
-OAuth based session management.
+OAuth based session management but support for this style of auth will remain as long as the Bluesky retains support
+for it.
 
 ### `createAccount( ... )`
-
-Create an account.
 
 ```perl
 $bsky->createAccount(
@@ -78,6 +76,8 @@ $bsky->createAccount(
     inviteCode => 'aaaa-bbbb-cccc-dddd'
 );
 ```
+
+Create an account if supported by the service.
 
 Expected parameters include:
 
@@ -111,7 +111,7 @@ Account login session returned on successful account creation.
 
 ### `login( ... )`
 
-Create an authentication session.
+Create an app password backed authentication session.
 
 ```perl
 my $session = $bsky->login(
@@ -139,19 +139,28 @@ Returns an authorized session on success.
 
 Resumes an app password based session.
 
-```
-$bsky->resumeSession( $savedSession );
+```perl
+$bsky->resumeSession(
+    accessJwt => '...',
+    resumeJwt => '...'
+);
 ```
 
 Expected parameters include:
 
-- `session`
+- `accessJwt` - required
+- `refreshJwt` - required
+
+If the `accessJwt` token has expired, we attempt to use the `refreshJwt` to continue the session with a new token. If
+that also fails, well, that's kinda it.
+
+The new session is returned on success.
 
 ## OAuth based session management
 
 Yeah, this is on the TODO list.
 
-# Feeds and Content
+# Feeds and Content Metods
 
 Most of a core client's functionality is covered by these methods.
 
@@ -176,6 +185,8 @@ Expected parameters include:
     Integer in the range of `1 .. 100`; the default is `50`.
 
 - `cursor`
+
+    Paginination support.
 
 ## `getAuthorFeed( ... )`
 
@@ -328,7 +339,44 @@ Expected parameters include:
 
 ## `post( ... )`
 
-TODO
+Get a list of reposts for a given post.
+
+```perl
+my $post = $at->post( text => 'Pretend this is super funny.' );
+```
+
+Expected parameters include:
+
+- `text` - required
+
+    The primary post content. May be an empty string, if there are embeds.
+
+- `cid`
+
+    If supplied, filters to reposts of specific version (by CID) of the post record.
+
+- `facets`
+
+    Annotations of text (mentions, URLs, hashtags, etc).
+
+- `reply`
+- `embed`
+
+    List of images, videos, etc. to display.
+
+- `langs`
+
+    Indicates human language of post primary text content.
+
+- `tags`
+
+    Additional hashtags, in addition to any included in post text and facets.
+
+- `createdAt`
+
+    Client-declared timestamp when this post was originally created.
+
+    If undefined, we fill this in with `<Time::Moment->now`>.
 
 ## `deletePost( ... )`
 

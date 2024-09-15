@@ -46,12 +46,13 @@ package At 1.0 {
             http       => $args{http},
             service    => $args{service},
             ratelimits => {                 # https://docs.bsky.app/docs/advanced-guides/rate-limits
-                global        => {},
-                updateHandle  => {},    # per DID
-                updateHandle  => {},    # per DID
-                createSession => {},    # per handle
-                deleteAccount => {},    # by IP
-                resetPassword => {}     # by IP
+
+                #~ global        => {},
+                #~ updateHandle  => {},    # per DID
+                #~ updateHandle  => {},    # per DID
+                #~ createSession => {},    # per handle
+                #~ deleteAccount => {},    # by IP
+                #~ resetPassword => {}     # by IP
             }
         }, $class;
     }
@@ -490,6 +491,9 @@ package At 1.0 {
                 elsif ( $schema->{format} eq 'handle' ) {
                     return At::Protocol::Handle->new($data);
                 }
+                elsif ( $schema->{format} eq 'language' ) {
+                    return $data;
+                }
                 warn $data;
                 ddx $schema;
                 ...;
@@ -520,7 +524,7 @@ At - The AT Protocol for Social Networking
 
     use At;
     my $bsky = At->new( service => 'https://bsky.social' );
-    # To be continued...
+    $bsky->post( text => 'Hi.' );
 
 =head1 DESCRIPTION
 
@@ -556,15 +560,13 @@ L<https://www.iana.org/assignments/language-subtag-registry/language-subtag-regi
 
 =head2 C<did( )>
 
-Gather the DID of the current user. Returns C<undef> if the client is not authenticated.
+Gather the DID of the current user. Returns C<undef> on failure or if the client is not authenticated.
 
     warn $bsky->did;
 
 =head1 Session Management
 
-You'll need an authenticated session for most API calls.
-
-There are two ways to manage sessions:
+You'll need an authenticated session for most API calls. There are two ways to manage sessions:
 
 =over
 
@@ -575,16 +577,16 @@ There are two ways to manage sessions:
 =back
 
 Developers of new code should be aware that the AT protocol will be L<transitioning to OAuth in over the next year or
-so (2024-2025)|https://github.com/bluesky-social/atproto/discussions/2656>.
+so (2024-2025)|https://github.com/bluesky-social/atproto/discussions/2656> and this distribution will comply with this
+change.
 
 =head2 App password based session management
 
 Please note that this auth method is deprecated in favor of OAuth based session management. It is recommended to use
-OAuth based session management.
+OAuth based session management but support for this style of auth will remain as long as the Bluesky retains support
+for it.
 
 =head3 C<createAccount( ... )>
-
-Create an account.
 
     $bsky->createAccount(
         email      => 'john@example.com',
@@ -592,6 +594,8 @@ Create an account.
         handle     => 'john.example.com',
         inviteCode => 'aaaa-bbbb-cccc-dddd'
     );
+
+Create an account if supported by the service.
 
 Expected parameters include:
 
@@ -633,7 +637,7 @@ Account login session returned on successful account creation.
 
 =head3 C<login( ... )>
 
-Create an authentication session.
+Create an app password backed authentication session.
 
     my $session = $bsky->login(
         identifier => 'john@example.com',
@@ -663,21 +667,31 @@ Returns an authorized session on success.
 
 Resumes an app password based session.
 
-    $bsky->resumeSession( $savedSession );
+    $bsky->resumeSession(
+        accessJwt => '...',
+        resumeJwt => '...'
+    );
 
 Expected parameters include:
 
 =over
 
-=item C<session>
+=item C<accessJwt> - required
+
+=item C<refreshJwt> - required
 
 =back
+
+If the C<accessJwt> token has expired, we attempt to use the C<refreshJwt> to continue the session with a new token. If
+that also fails, well, that's kinda it.
+
+The new session is returned on success.
 
 =head2 OAuth based session management
 
 Yeah, this is on the TODO list.
 
-=head1 Feeds and Content
+=head1 Feeds and Content Metods
 
 Most of a core client's functionality is covered by these methods.
 
@@ -702,6 +716,8 @@ NOTE: most feed flexibility has been moved to feed generator mechanism.
 Integer in the range of C<1 .. 100>; the default is C<50>.
 
 =item C<cursor>
+
+Paginination support.
 
 =back
 
@@ -875,7 +891,47 @@ The number of reposts to return per page in the range of C<1 .. 100>; the defaul
 
 =head2 C<post( ... )>
 
-TODO
+Get a list of reposts for a given post.
+
+    my $post = $at->post( text => 'Pretend this is super funny.' );
+
+Expected parameters include:
+
+=over
+
+=item C<text> - required
+
+The primary post content. May be an empty string, if there are embeds.
+
+=item C<cid>
+
+If supplied, filters to reposts of specific version (by CID) of the post record.
+
+=item C<facets>
+
+Annotations of text (mentions, URLs, hashtags, etc).
+
+=item C<reply>
+
+=item C<embed>
+
+List of images, videos, etc. to display.
+
+=item C<langs>
+
+Indicates human language of post primary text content.
+
+=item C<tags>
+
+Additional hashtags, in addition to any included in post text and facets.
+
+=item C<createdAt>
+
+Client-declared timestamp when this post was originally created.
+
+If undefined, we fill this in with C<<Time::Moment-E<gt>now>>.
+
+=back
 
 =head2 C<deletePost( ... )>
 
@@ -1073,7 +1129,7 @@ Sanko Robinson E<lt>sanko@cpan.orgE<gt>
 
 =begin stopwords
 
-atproto Bluesky unfollow reposts auth authed login aka eg
+atproto Bluesky unfollow reposts auth authed login aka eg kinda hashtags
 
 =end stopwords
 
