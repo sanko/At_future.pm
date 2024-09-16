@@ -538,119 +538,44 @@ Expected parameters include:
 
 - `uri` - required
 
-## `block( ... )`
+# Actor Methods
 
-```
-$bsky->block( 'sankor.bsky.social' );
-```
+Methods related to Bluesky accounts or 'actors' are listed here.
 
-Blocks a user.
-
-Expected parameters include:
-
-- `identifier` - required
-
-    Handle or DID of the person you'd like to block.
-
-Returns a true value on success.
-
-## `unblock( ... )`
-
-```
-$bsky->unblock( 'sankor.bsky.social' );
-```
-
-Unblocks a user.
-
-Expected parameters include:
-
-- `identifier` - required
-
-    Handle or DID of the person you'd like to block.
-
-Returns a true value on success.
-
-## `follow( ... )`
-
-```
-$bsky->follow( 'sankor.bsky.social' );
-```
-
-Follow a user.
-
-Expected parameters include:
-
-- `identifier` - required
-
-    Handle or DID of the person you'd like to follow.
-
-Returns a true value on success.
-
-## `unfollow( ... )`
-
-```
-$bsky->unfollow( 'sankor.bsky.social' );
-```
-
-Unfollows a user.
-
-Expected parameters include:
-
-- `identifier` - required
-
-    Handle or DID of the person you'd like to unfollow.
-
-Returns a true value on success.
-
-## `post( ... )`
+## `getProfile( ... )`
 
 ```perl
-$bsky->post( text => 'Hello, world!' );
+my $profile = $bsky->getProfile( 'did:plc:pwqewimhd3rxc4hg6ztwrcyj' );
 ```
 
-Create a new post.
+Get detailed profile view of an actor. Does not require auth, but contains relevant metadata with auth.
 
 Expected parameters include:
 
-- `text` - required
+- `actor` - required
 
-    Text content of the post. Must be 300 characters or fewer.
+    Handle or DID of account to fetch profile of.
 
-Note: This method will grow to support more features in the future.
+## `upsertProfile( ... )`
 
-Returns the CID and AT-URI values on success.
-
-## `delete( ... )`
-
-```
-$bsky->delete( 'at://...' );
+```perl
+my $commit = $bsky->upsertProfile( sub (%current) { ... } );
 ```
 
-Delete a post.
+Pull your current profile and merge it with new content.
 
 Expected parameters include:
 
-- `url` - required
+- `function` - required
 
-    The AT-URI of the post.
+    This is a callback that is handed the current profile. The return value is then passed along to update or insert the
+    Bluesky profile record.
 
-Returns a true value on success.
+- `attempts`
 
-## `profile( ... )`
+    How many attempts should be made to gather the current profile if it exists.
 
-```
-$bsky->profile( 'sankor.bsky.social' );
-```
-
-Gathers profile data.
-
-Expected parameters include:
-
-- `identifier` - required
-
-    Handle or DID of the person you'd like information on.
-
-Returns a hash of data on success.
+    The current default is `5` which emulates the behavior in the official client.
 
 # Error Handling
 

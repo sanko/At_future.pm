@@ -19,7 +19,7 @@ my $bsky;
 
 # Utils
 sub getProfileDisplayName () {
-    my $h = $bsky->getProfile( actor => $bsky->did, rkey => 'self' );
+    my $h = $bsky->getProfile( $bsky->did );
     $h->throw unless $h;
     $h->{displayName} // ();
 }

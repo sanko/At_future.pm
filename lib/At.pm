@@ -241,14 +241,14 @@ package At 1.0 {
     }
 
     # Actors
-    sub getProfile ( $s, %args ) {
-        At::app::bsky::actor::getProfile( $s, content => \%args );
+    sub getProfile ( $s, $actor ) {
+        At::app::bsky::actor::getProfile( $s, content => { actor => $actor } );
     }
 
-    sub upsertProfile ( $s, $fn ) {
+    sub upsertProfile ( $s, $fn, $tries //= 5 ) {
         my $repo = $s->did;
         my $existing;
-        for ( 0 .. 5 ) {    # Might take a few tries
+        for ( 0 .. $tries ) {    # Might take a few tries
             $existing
                 ||= At::com::atproto::repo::getRecord( $s, content => { repo => $repo, collection => 'app.bsky.actor.profile', rkey => 'self' } );
 
@@ -266,10 +266,9 @@ package At 1.0 {
             );
             return $okay if $okay;
         }
-        ();
+        ();    # XXX: Should I pass back an Error object?
     }
 
-    #~ await agent.getProfiles(params, opts)
     #~ await agent.getSuggestions(params, opts)
     #~ await agent.searchActors(params, opts)
     #~ await agent.searchActorsTypeahead(params, opts)
@@ -1112,133 +1111,48 @@ Expected parameters include:
 
 =back
 
-=head2 C<block( ... )>
+=head1 Actor Methods
 
-    $bsky->block( 'sankor.bsky.social' );
+Methods related to Bluesky accounts or 'actors' are listed here.
 
-Blocks a user.
+=head2 C<getProfile( ... )>
 
-Expected parameters include:
+    my $profile = $bsky->getProfile( 'did:plc:pwqewimhd3rxc4hg6ztwrcyj' );
 
-=over
-
-=item C<identifier> - required
-
-Handle or DID of the person you'd like to block.
-
-=back
-
-Returns a true value on success.
-
-=head2 C<unblock( ... )>
-
-    $bsky->unblock( 'sankor.bsky.social' );
-
-Unblocks a user.
+Get detailed profile view of an actor. Does not require auth, but contains relevant metadata with auth.
 
 Expected parameters include:
 
 =over
 
-=item C<identifier> - required
+=item C<actor> - required
 
-Handle or DID of the person you'd like to block.
+Handle or DID of account to fetch profile of.
 
 =back
 
-Returns a true value on success.
+=head2 C<upsertProfile( ... )>
 
-=head2 C<follow( ... )>
+    my $commit = $bsky->upsertProfile( sub (%current) { ... } );
 
-    $bsky->follow( 'sankor.bsky.social' );
-
-Follow a user.
+Pull your current profile and merge it with new content.
 
 Expected parameters include:
 
 =over
 
-=item C<identifier> - required
+=item C<function> - required
 
-Handle or DID of the person you'd like to follow.
+This is a callback that is handed the current profile. The return value is then passed along to update or insert the
+Bluesky profile record.
 
-=back
+=item C<attempts>
 
-Returns a true value on success.
+How many attempts should be made to gather the current profile if it exists.
 
-=head2 C<unfollow( ... )>
-
-    $bsky->unfollow( 'sankor.bsky.social' );
-
-Unfollows a user.
-
-Expected parameters include:
-
-=over
-
-=item C<identifier> - required
-
-Handle or DID of the person you'd like to unfollow.
+The current default is C<5> which emulates the behavior in the official client.
 
 =back
-
-Returns a true value on success.
-
-=head2 C<post( ... )>
-
-    $bsky->post( text => 'Hello, world!' );
-
-Create a new post.
-
-Expected parameters include:
-
-=over
-
-=item C<text> - required
-
-Text content of the post. Must be 300 characters or fewer.
-
-=back
-
-Note: This method will grow to support more features in the future.
-
-Returns the CID and AT-URI values on success.
-
-=head2 C<delete( ... )>
-
-    $bsky->delete( 'at://...' );
-
-Delete a post.
-
-Expected parameters include:
-
-=over
-
-=item C<url> - required
-
-The AT-URI of the post.
-
-=back
-
-Returns a true value on success.
-
-=head2 C<profile( ... )>
-
-    $bsky->profile( 'sankor.bsky.social' );
-
-Gathers profile data.
-
-Expected parameters include:
-
-=over
-
-=item C<identifier> - required
-
-Handle or DID of the person you'd like information on.
-
-=back
-
-Returns a hash of data on success.
 
 =head1 Error Handling
 
