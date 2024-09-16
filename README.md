@@ -160,7 +160,7 @@ The new session is returned on success.
 
 Yeah, this is on the TODO list.
 
-# Feeds and Content Metods
+# Feeds and Content Methods
 
 Most of a core client's functionality is covered by these methods.
 
@@ -380,46 +380,163 @@ Expected parameters include:
 
 ## `deletePost( ... )`
 
-TODO
+```
+$at->deletePost( $post->{uri} );
+```
+
+Delete a post.
+
+- `uri` - required
+
+    AT-URI link for the post to delete.
 
 ## `like( ... )`
 
-TODO
+```perl
+my $like = $at->like( $post->{uri}, $post->{cid} );
+```
+
+Like a post. Note that likes are public.
+
+- `uri` - required
+
+    AT-URI link for the post to delete.
+
+- `cid` - required
+
+    [CID](https://docs.ipfs.tech/concepts/content-addressing/#identifier-formats) of the post.
 
 ## `deleteLike( ... )`
 
-TODO
+```
+$bsky->deleteLike ( $like->{uri} );
+```
+
+Removes a like.
 
 ## `repost( ... )`
 
-TODO
+```perl
+my $repost = $bsky->repost( $post->{uri}, $post->{cid} ),
+```
 
-## `deleteRepost( ... )`
-
-TODO
-
-## `uploadBlob( ... )`
-
-TODO
-
-## `( ... )`
-
-TODO
-
-## `( ... )`
-
-TODO
+Reposts content. Note that reposts are public.
 
 Expected parameters include:
 
-- `identifier`
+- `uri` - required
+- `cid` - required
 
-    Handle or other identifier supported by the server for the authenticating user.
+## `deleteRepost( ... )`
 
-- `password`
+```perl
+my $repost = $bsky->deleteRepost( $repost->{uri} ),
+```
 
-    This is the app password not the account's password. App passwords are generated at
-    [https://bsky.app/settings/app-passwords](https://bsky.app/settings/app-passwords).
+Removes a repost.
+
+Expected parameters include:
+
+- `uri` - required
+
+## `uploadBlob( ... )`
+
+```perl
+my $blob = $bsky->uploadBlob( $data, 'image/jpeg' );
+```
+
+Upload a new blob, to be referenced from a repository record.
+
+Expected parameters include:
+
+- `data` - required
+
+    Raw data to sent.
+
+- `mimetype`
+
+The blob will be deleted if it is not referenced within a time window (eg, minutes). Blob restrictions (mimetype, size,
+etc) are enforced when the reference is created. Requires auth, implemented by PDS.
+
+# Social Graph Methods
+
+Methods dealing with social relationships between accounts are listed here.
+
+## `getFollows( ... )`
+
+```perl
+my $follows = $bsky->getFollows( 'did:plc:pwqewimhd3rxc4hg6ztwrcyj' );
+```
+
+Enumerates accounts which a specified account (actor) follows.
+
+Expected parameters include:
+
+- `actor` - required
+- `limit`
+
+    The number of results to return per request.
+
+    This must be between `1` and `100` (inclusive) and is `50` by default.
+
+- `cursor`
+
+    Paginination support.
+
+## `getFollowers( ... )`
+
+```perl
+my $followers = $bsky->getFollowers( 'did:plc:pwqewimhd3rxc4hg6ztwrcyj' );
+```
+
+Enumerates accounts which follow a specified account (actor).
+
+Expected parameters include:
+
+- `actor` - required
+- `limit`
+
+    The number of results to return per request.
+
+    This must be between `1` and `100` (inclusive) and is `50` by default.
+
+- `cursor`
+
+    Paginination support.
+
+## `follow( ... )`
+
+```perl
+my $follow = $bsky->follow( 'did:plc:pwqewimhd3rxc4hg6ztwrcyj' );
+```
+
+Create a record declaring a social 'follow' relationship of another account.
+
+Expected parameters include:
+
+- `subject` - required
+
+    The account you'd like to follow.
+
+- `createdAt`
+
+    Client-declared timestamp when this post was originally created.
+
+    If undefined, we fill this in with `<Time::Moment->now`>.
+
+Duplicate follows will be ignored by the AppView.
+
+## `deleteFollow( ... )`
+
+```
+$bsky->deleteFollow( $follow->{uri} );
+```
+
+Delete a 'follow' relationship.
+
+Expected parameters include:
+
+- `uri` - required
 
 ## `block( ... )`
 

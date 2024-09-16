@@ -691,7 +691,7 @@ The new session is returned on success.
 
 Yeah, this is on the TODO list.
 
-=head1 Feeds and Content Metods
+=head1 Feeds and Content Methods
 
 Most of a core client's functionality is covered by these methods.
 
@@ -935,48 +935,180 @@ If undefined, we fill this in with C<<Time::Moment-E<gt>now>>.
 
 =head2 C<deletePost( ... )>
 
-TODO
+    $at->deletePost( $post->{uri} );
+
+Delete a post.
+
+=over
+
+=item C<uri> - required
+
+AT-URI link for the post to delete.
+
+=back
 
 =head2 C<like( ... )>
 
-TODO
+    my $like = $at->like( $post->{uri}, $post->{cid} );
+
+Like a post. Note that likes are public.
+
+=over
+
+=item C<uri> - required
+
+AT-URI link for the post to delete.
+
+=item C<cid> - required
+
+L<CID|https://docs.ipfs.tech/concepts/content-addressing/#identifier-formats> of the post.
+
+=back
 
 =head2 C<deleteLike( ... )>
 
-TODO
+    $bsky->deleteLike ( $like->{uri} );
+
+Removes a like.
 
 =head2 C<repost( ... )>
 
-TODO
+    my $repost = $bsky->repost( $post->{uri}, $post->{cid} ),
 
-=head2 C<deleteRepost( ... )>
-
-TODO
-
-=head2 C<uploadBlob( ... )>
-
-TODO
-
-=head2 C<( ... )>
-
-TODO
-
-=head2 C<( ... )>
-
-TODO
+Reposts content. Note that reposts are public.
 
 Expected parameters include:
 
 =over
 
-=item C<identifier>
+=item C<uri> - required
 
-Handle or other identifier supported by the server for the authenticating user.
+=item C<cid> - required
 
-=item C<password>
+=back
 
-This is the app password not the account's password. App passwords are generated at
-L<https://bsky.app/settings/app-passwords>.
+=head2 C<deleteRepost( ... )>
+
+ my $repost = $bsky->deleteRepost( $repost->{uri} ),
+
+Removes a repost.
+
+Expected parameters include:
+
+=over
+
+=item C<uri> - required
+
+=back
+
+=head2 C<uploadBlob( ... )>
+
+    my $blob = $bsky->uploadBlob( $data, 'image/jpeg' );
+
+Upload a new blob, to be referenced from a repository record.
+
+Expected parameters include:
+
+=over
+
+=item C<data> - required
+
+Raw data to sent.
+
+=item C<mimetype>
+
+=back
+
+The blob will be deleted if it is not referenced within a time window (eg, minutes). Blob restrictions (mimetype, size,
+etc) are enforced when the reference is created. Requires auth, implemented by PDS.
+
+=head1 Social Graph Methods
+
+Methods dealing with social relationships between accounts are listed here.
+
+=head2 C<getFollows( ... )>
+
+    my $follows = $bsky->getFollows( 'did:plc:pwqewimhd3rxc4hg6ztwrcyj' );
+
+Enumerates accounts which a specified account (actor) follows.
+
+Expected parameters include:
+
+=over
+
+=item C<actor> - required
+
+=item C<limit>
+
+The number of results to return per request.
+
+This must be between C<1> and C<100> (inclusive) and is C<50> by default.
+
+=item C<cursor>
+
+Paginination support.
+
+=back
+
+=head2 C<getFollowers( ... )>
+
+    my $followers = $bsky->getFollowers( 'did:plc:pwqewimhd3rxc4hg6ztwrcyj' );
+
+Enumerates accounts which follow a specified account (actor).
+
+Expected parameters include:
+
+=over
+
+=item C<actor> - required
+
+=item C<limit>
+
+The number of results to return per request.
+
+This must be between C<1> and C<100> (inclusive) and is C<50> by default.
+
+=item C<cursor>
+
+Paginination support.
+
+=back
+
+=head2 C<follow( ... )>
+
+    my $follow = $bsky->follow( 'did:plc:pwqewimhd3rxc4hg6ztwrcyj' );
+
+Create a record declaring a social 'follow' relationship of another account.
+
+Expected parameters include:
+
+=over
+
+=item C<subject> - required
+
+The account you'd like to follow.
+
+=item C<createdAt>
+
+Client-declared timestamp when this post was originally created.
+
+If undefined, we fill this in with C<<Time::Moment-E<gt>now>>.
+
+=back
+
+Duplicate follows will be ignored by the AppView.
+
+=head2 C<deleteFollow( ... )>
+
+    $bsky->deleteFollow( $follow->{uri} );
+
+Delete a 'follow' relationship.
+
+Expected parameters include:
+
+=over
+
+=item C<uri> - required
 
 =back
 
@@ -1129,7 +1261,7 @@ Sanko Robinson E<lt>sanko@cpan.orgE<gt>
 
 =begin stopwords
 
-atproto Bluesky unfollow reposts auth authed login aka eg kinda hashtags
+atproto Bluesky unfollow reposts auth authed login aka eg kinda hashtags repost mimetype
 
 =end stopwords
 
