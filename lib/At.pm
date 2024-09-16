@@ -269,6 +269,7 @@ package At 1.0 {
         ();    # XXX: Should I pass back an Error object?
     }
 
+    #~ await agent.getProfiles(params, opts)
     #~ await agent.getSuggestions(params, opts)
     #~ await agent.searchActors(params, opts)
     #~ await agent.searchActorsTypeahead(params, opts)
@@ -1154,6 +1155,81 @@ The current default is C<5> which emulates the behavior in the official client.
 
 =back
 
+=head1 Advanced API Calls
+
+The methods above are convenience wrappers. It covers most but not all available methods.
+
+The AT Protocol identifies methods and records with reverse-DNS names. You can use them on the agent as well:
+
+    my $res1 = At::com::atproto::repo::createRecord(
+        $bsky,
+        content => {
+            did        => 'alice.did',
+            collection => 'app.bsky.feed.post',
+            record     => {
+                '$type'  => 'app.bsky.feed.post',
+                text      => 'Hello, world!',
+                createdAt => Time::Moment->now->to_string
+            }
+        }
+    );
+
+    my $res2 = At::com::atproto::repo::listRecords(
+        $bsky,
+        content => {
+          repo       => 'alice.did',
+          collection => 'app.bsky.feed.post'
+        }
+    );
+
+    my $res3 = At::app::bsky::feed::post::create(
+        $bsky,-
+        { repo: alice.did },
+        {
+            text: 'Hello, world!',
+                createdAt => Time::Moment->now->to_string
+        }
+    );
+
+    my $res4 = At::app::bsky::feed::post::list($bsky, content => { repo: 'alice.did' });
+
+=head1 Rich Text
+
+Some records (posts, etc.) use the C<app.bsky.richtext> lexicon. At the moment, richtext is only used for links and
+mentions, but it will be extended over time to include bold, italic, and so on.
+
+    my $rt = At::RichText->new(
+        text => 'Hello @alice.com, check out this link: https://example.com'
+    );
+    $rt->detectFacets($agent); # Automatically detects mentions and links
+    my $postRecord = {
+        '$type'   => 'app.bsky.feed.post',
+        text      => $rt->text,
+        facets    => $rt->facets,
+        createdAt => Time::Moment->new->to_string
+    };
+
+    # Rendering as markdown
+    my $markdown = '';
+    for my $segment ($rt->segments){
+        if ($segment->isLink()) {
+            $markdown .= sprintf '[%s](%s)', $segment->text, $segment->link->uri
+        }
+        elsif($segment->isMention()){
+            $markdown .= sprintf '[%s](https://my-bsky-app.com/user/%s)', $segment->text, $segment->mention->did
+        }
+        else{
+        $markdown .= $segment->text
+    }
+
+    # calculating string lengths
+    my $rt2 = At::RichText->new(text => 'Hello');
+    warn $rt2->length; # 5
+    warn $rt2->graphemeLength; # 5
+    my $rt3 = At::RichText->new(text => '👨‍👩‍👧‍👧');
+    warn $rt3->length; # 25
+    warn $rt3->graphemeLength; # 1
+
 =head1 Error Handling
 
 Exception handling is carried out by returning objects with untrue boolean values.
@@ -1161,6 +1237,8 @@ Exception handling is carried out by returning objects with untrue boolean value
 =head1 See Also
 
 L<App::bsky> - Bluesky client on the command line
+
+L<https://docs.bsky.app/docs/api/>
 
 =head1 LICENSE
 
@@ -1175,7 +1253,7 @@ Sanko Robinson E<lt>sanko@cpan.orgE<gt>
 
 =begin stopwords
 
-atproto Bluesky unfollow reposts auth authed login aka eg kinda hashtags repost mimetype
+atproto Bluesky unfollow reposts auth authed login aka eg kinda hashtags repost mimetype richtext
 
 =end stopwords
 
