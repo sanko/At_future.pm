@@ -299,17 +299,18 @@ package At 1.0 {
             {
                 no strict 'refs';
                 *{ namespace2package($namespace) . '::new' } = sub ( $class, %args ) {
-
-                    # Only verify if fields are missing
                     my @missing = sort grep { !defined $args{$_} } @{ $schema->{required} };
                     Carp::croak sprintf 'missing required field%s in %s->new(...): %s', ( scalar @missing == 1 ? '' : 's' ), $class, join ', ',
                         @missing
                         if @missing;
+                    for my $property ( keys %{ $schema->{properties} } ) {
+                        $args{$property} = _coerce( $namespace, $schema->{properties}{$property}, $args{$property} ) if defined $args{$property};
+                    }
                     bless \%args, $class;
                 };
                 for my $property ( keys %{ $schema->{properties} } ) {
                     *{ namespace2package($namespace) . '::' . $property } = sub ( $s, $new //= () ) {
-                        $s->{$property} = $new if defined $new;
+                        $s->{$property} = _coerce( $namespace, $schema->{properties}{$property}, $new ) if defined $new;
                         $s->{$property};
                     }
                 }
