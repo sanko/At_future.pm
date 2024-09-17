@@ -16,6 +16,7 @@ package At 1.0 {
     use At::Protocol::Handle;
     use At::Protocol::NSID;
     use At::Protocol::URI;
+    use At::Utils qw[namespace2package];
     #
     use Data::Dump;
     #
@@ -297,7 +298,7 @@ package At 1.0 {
             $current_ref->{ $path_components[-1] } = $schema;
             {
                 no strict 'refs';
-                *{ _namespace2package($namespace) . '::new' } = sub ( $class, %args ) {
+                *{ namespace2package($namespace) . '::new' } = sub ( $class, %args ) {
 
                     # Only verify if fields are missing
                     my @missing = sort grep { !defined $args{$_} } @{ $schema->{required} };
@@ -307,18 +308,18 @@ package At 1.0 {
                     bless \%args, $class;
                 };
                 for my $property ( keys %{ $schema->{properties} } ) {
-                    *{ _namespace2package($namespace) . '::' . $property } = sub ( $s, $new //= () ) {
+                    *{ namespace2package($namespace) . '::' . $property } = sub ( $s, $new //= () ) {
                         $s->{$property} = $new if defined $new;
                         $s->{$property};
                     }
                 }
-                *{ _namespace2package($namespace) . '::_schema' } = sub ($s) {
+                *{ namespace2package($namespace) . '::_schema' } = sub ($s) {
                     $schema;
                 };
-                *{ _namespace2package($namespace) . '::_namespace' } = sub ($s) {
+                *{ namespace2package($namespace) . '::_namespace' } = sub ($s) {
                     $namespace;
                 };
-                *{ _namespace2package($namespace) . '::verify' } = sub ($s) {
+                *{ namespace2package($namespace) . '::verify' } = sub ($s) {
 
                     # TODO: verify that data fills schema requirements
                     #~ ddx $schema;
@@ -427,7 +428,7 @@ package At 1.0 {
                     elsif ( $schema->{type} eq 'subscription' ) { use Data::Dump; ddx $schema; }
                     elsif ( $schema->{type} eq 'token' ) {    # Generally just a string
                         my $namespace = $fqdn =~ s[[#\.]][::]gr;
-                        my $package   = _namespace2package($fqdn);
+                        my $package   = namespace2package($fqdn);
                         no strict 'refs';
 
                         #~ *{ $package . "::(\"\"" } = sub ( $s, $u, $q ) { $fqdn };
@@ -443,11 +444,6 @@ package At 1.0 {
             }
         }
     }
-
-    sub _namespace2package ($fqdn) {
-        my $namespace = $fqdn =~ s[[#\.]][::]gr;
-        'At::Lexicon::' . $namespace;
-    }
     my %coercions = (
         array => sub ( $namespace, $schema, $data ) {
             [ map { _coerce( $namespace, $schema->{items}, $_ ) } @$data ]
@@ -462,7 +458,7 @@ package At 1.0 {
             for my ( $name, $subschema )( %{ $schema->{properties} } ) {
                 $data->{$name} = _coerce( $namespace, $subschema, $data->{$name} );
             }
-            _namespace2package($namespace)->new(%$data);
+            namespace2package($namespace)->new(%$data);
         },
         ref => sub ( $namespace, $schema, $data ) {
             $namespace = _namespace( $namespace, $schema->{ref} );
@@ -473,7 +469,7 @@ package At 1.0 {
         union => sub ( $namespace, $schema, $data ) {
             my @namespaces = map { _namespace( $namespace, $_ ) } @{ $schema->{refs} };
             Carp::cluck 'Incorrect union type: ' . $data->{'$type'} unless grep { $data->{'$type'} eq $_ } @namespaces;
-            bless _coerce( $data->{'$type'}, _get_capture( $data->{'$type'} ), $data ), _namespace2package( $data->{'$type'} );
+            bless _coerce( $data->{'$type'}, _get_capture( $data->{'$type'} ), $data ), namespace2package( $data->{'$type'} );
         },
         unknown => sub ( $namespace, $schema, $data ) {$data},
         string  => sub ( $namespace, $schema, $data ) {
