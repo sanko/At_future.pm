@@ -425,7 +425,9 @@ package At 1.0 {
                         _set_capture( join( '.', $raw->{id}, ( $name eq 'main' ? () : $name ) ), $schema );
                     }
                     elsif ( $schema->{type} eq 'string' )       { _set_capture( $fqdn, $schema ); }
-                    elsif ( $schema->{type} eq 'subscription' ) { use Data::Dump; ddx $schema; }
+                    elsif ( $schema->{type} eq 'subscription' ) {
+                        #~ use Data::Dump; ddx $schema;
+                    }
                     elsif ( $schema->{type} eq 'token' ) {    # Generally just a string
                         my $namespace = $fqdn =~ s[[#\.]][::]gr;
                         my $package   = namespace2package($fqdn);
