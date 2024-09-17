@@ -27,16 +27,53 @@ subtest 'calculates bytelength and grapheme length correctly' => sub {
     }
 };
 subtest 'insert' => sub {
-    isa_ok my $input
-        = At::RichText->new( text => 'hello world', facets => [ { index => { byteStart => 2, byteEnd => 7 }, features => [ { '$type' => '' } ] } ] ),
-        ['At::RichText'];
     subtest 'correctly adjusts facets (scenario A - before)' => sub {
-        my $output = $input;    # clone
-        $output->insert( 0, 'test' );
-        is $output->text,                          'testhello world', 'inserted';
-        is $output->facets->[0]->index->byteStart, 6,                 'byteStart';
-        is $output->facets->[0]->index->byteEnd,   11,                'byteEnd';
-        is substr( $output->text, 6, 5 ),          'llo w',           'substr';
+        isa_ok my $input = At::RichText->new(
+            text   => 'hello world',
+            facets => [
+                {   index    => { byteStart => 2, byteEnd => 7 },
+                    features => [ { '$type' => 'app.bsky.richtext.facet#tag', tag => 'https://google.com/' } ]
+                }
+            ]
+            ),
+            ['At::RichText'];
+        $input->insert( 0, 'test' );
+        is $input->text,                          'testhello world', 'inserted';
+        is $input->facets->[0]->index->byteStart, 6,                 'byteStart';
+        is $input->facets->[0]->index->byteEnd,   11,                'byteEnd';
+        is substr( $input->text, 6, 5 ),          'llo w',           'substr';
+    };
+    subtest 'correctly adjusts facets (scenario B - inner)' => sub {
+        isa_ok my $input = At::RichText->new(
+            text   => 'hello world',
+            facets => [
+                {   index    => { byteStart => 2, byteEnd => 7 },
+                    features => [ { '$type' => 'app.bsky.richtext.facet#tag', tag => 'https://google.com/' } ]
+                }
+            ]
+            ),
+            ['At::RichText'];
+        $input->insert( 4, 'test' );
+        is $input->text,                          'helltesto world', 'inserted';
+        is $input->facets->[0]->index->byteStart, 2,                 'byteStart';
+        is $input->facets->[0]->index->byteEnd,   11,                'byteEnd';
+        is substr( $input->text, 2, 9 ),          'lltesto w',       'substr';
+    };
+    subtest 'correctly adjusts facets (scenario C - after)' => sub {
+        isa_ok my $input = At::RichText->new(
+            text   => 'hello world',
+            facets => [
+                {   index    => { byteStart => 2, byteEnd => 7 },
+                    features => [ { '$type' => 'app.bsky.richtext.facet#tag', tag => 'https://google.com/' } ]
+                }
+            ]
+            ),
+            ['At::RichText'];
+        $input->insert( 8, 'test' );
+        is $input->text,                          'hello wotestrld', 'inserted';
+        is $input->facets->[0]->index->byteStart, 2,                 'byteStart';
+        is $input->facets->[0]->index->byteEnd,   7,                 'byteEnd';
+        is substr( $input->text, 2, 5 ),          'llo w',           'substr';
     };
 };
 #
@@ -45,18 +82,6 @@ subtest 'insert' => sub {
 
 =begin TODO
 
-  it('correctly adjusts facets (scenario B - inner)', () => {
-    const output = input.clone().insert(4, 'test')
-    expect(output.text).toEqual('helltesto world')
-    expect(output.facets?.[0].index.byteStart).toEqual(2)
-    expect(output.facets?.[0].index.byteEnd).toEqual(11)
-    expect(
-      output.unicodeText.slice(
-        output.facets?.[0].index.byteStart,
-        output.facets?.[0].index.byteEnd,
-      ),
-    ).toEqual('lltesto w')
-  })
 
   it('correctly adjusts facets (scenario C - after)', () => {
     const output = input.clone().insert(8, 'test')

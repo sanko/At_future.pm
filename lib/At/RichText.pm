@@ -5,151 +5,40 @@ package At::RichText 1.0 {
     use lib '../../lib';
     use At::Utils;
     use overload '""' => sub( $s, $q, $u ) {'TODO'};
+    #
+    sub new ( $class, %args ) {
+        $args{text} //= '';
+        $args{facets} = [ map { builtin::blessed $_ ? $_ : At::Lexicon::app::bsky::richtext::facet->new(%$_) } @{ $args{facets} } ];
+        bless \%args, $class;
+    }
+    sub text($s)           { $s->{text} }
+    sub facets($s)         { $s->{facets} }
+    sub length($s)         { At::Utils::byteLength $s->{text} }
+    sub graphemeLength($s) { At::Utils::graphemeLength $s->{text} }
 
-    class At::RichText 1.0 {
-        field $text : param;
-        field $facets : param //= [];
-        #
-        ADJUST {
-            $facets = [ map { builtin::blessed $_ ? $_ : At::RichText::Facet->new(%$_) } @$facets ];
-
-            #~ $facets = [ map { builtin::blessed $_ ? $_ : defined $_->{'$type'} ?
-            #~ (At::Utils::namespace2package( $_->{'$type'} )//'')->new(%$_) : $_ }
-            #~ @$facets ];
-        }
-
-        # Accessors didn't show up until 5.40...
-        method text()           {$text}
-        method facets()         {$facets}
-        method length()         { At::Utils::byteLength $text }
-        method graphemeLength() { At::Utils::graphemeLength $text }
-        #
-        method insert( $insert_index, $insert_text ) {
-            use bytes;
-            substr $text, $insert_index, 0, $insert_text;
-            return $self if !@$facets;    # don't bother
+    sub insert( $s, $insert_index, $insert_text ) {
+        use bytes;
+        substr $s->{text}, $insert_index, 0, $insert_text;
+        if ( @{ $s->{facets} } ) {
             my $numCharsAdded = At::Utils::byteLength($insert_text);
-            for my $ent (@$facets) {
+            for my $ent ( @{ $s->{facets} } ) {
 
-                # See comment at op of https://github.com/bluesky-social/atproto/blob/main/packages/api/src/rich-text/rich-text.ts
-                #  for labels of each scenario.
                 # Scenario A (before)
                 if ( $insert_index <= $ent->index->byteStart ) {
                     $ent->index->byteStart( $ent->index->byteStart + $numCharsAdded );
                     $ent->index->byteEnd( $ent->index->byteEnd + $numCharsAdded );
                 }
+
+                # Scenario B (after)
+                elsif ( $insert_index >= $ent->index->byteStart && $insert_index < $ent->index->byteEnd ) {    # move end by num added
+                    $ent->index->byteEnd( $ent->index->byteEnd + $numCharsAdded );
+                }
+
+                # Scenario C (after)
+                # noop?
             }
         }
-    }
-
-    class At::RichText::Facet::byteSlice 1.0 {
-        field $byteStart : param;
-        field $byteEnd : param;
-
-        # Accessors didn't show up until 5.40...
-        method byteStart( $v //= () ) { $byteStart = $v if defined $v; $byteStart }
-        method byteEnd( $v   //= () ) { $byteEnd   = $v if defined $v; $byteEnd }
-    }
-
-    class At::RichText::Facet 1.0 {
-        field $index : param;
-        field $features : param;    # Array of lex:app.bsky.richtext.facet#mention, #link, or #tag
-
-        # Accessors didn't show up until 5.40...
-        method index() {$index}
-        #
-        ADJUST {
-            $index    = At::RichText::Facet::byteSlice->new(%$index) unless builtin::blessed $index;
-            $features = [
-                map {
-                    return $_ if builtin::blessed $_;
-                    my $type = $_->{'$type'} ? At::Utils::namespace2package( $_->{'$type'} ) : ();
-                    defined $type ? $type->(%$_) : $_
-                } @$features
-            ];
-        }
-
-#~ AppBskyRichtextFacet: {
-#~ lexicon: 1,
-#~ id: 'app.bsky.richtext.facet',
-#~ defs: {
-#~ main: {
-#~ type: 'object',
-#~ description: 'Annotation of a sub-string within rich text.',
-#~ required: ['index', 'features'],
-#~ properties: {
-#~ index: {
-#~ type: 'ref',
-#~ ref: 'lex:app.bsky.richtext.facet#byteSlice',
-#~ },
-#~ features: {
-#~ type: 'array',
-#~ items: {
-#~ type: 'union',
-#~ refs: [
-#~ 'lex:app.bsky.richtext.facet#mention',
-#~ 'lex:app.bsky.richtext.facet#link',
-#~ 'lex:app.bsky.richtext.facet#tag',
-#~ ],
-#~ },
-#~ },
-#~ },
-#~ },
-#~ mention: {
-#~ type: 'object',
-#~ description:
-#~ "Facet feature for mention of another account. The text is usually a handle, including a '@' prefix, but the facet reference is a DID.",
-#~ required: ['did'],
-#~ properties: {
-#~ did: {
-#~ type: 'string',
-#~ format: 'did',
-#~ },
-#~ },
-#~ },
-#~ link: {
-#~ type: 'object',
-#~ description:
-#~ 'Facet feature for a URL. The text URL may have been simplified or truncated, but the facet reference should be a complete URL.',
-#~ required: ['uri'],
-#~ properties: {
-#~ uri: {
-#~ type: 'string',
-#~ format: 'uri',
-#~ },
-#~ },
-#~ },
-#~ tag: {
-#~ type: 'object',
-#~ description:
-#~ "Facet feature for a hashtag. The text usually includes a '#' prefix, but the facet reference should not (except in the case of 'double hash tags').",
-#~ required: ['tag'],
-#~ properties: {
-#~ tag: {
-#~ type: 'string',
-#~ maxLength: 640,
-#~ maxGraphemes: 64,
-#~ },
-#~ },
-#~ },
-#~ byteSlice: {
-#~ type: 'object',
-#~ description:
-#~ 'Specifies the sub-string range a facet feature applies to. Start index is inclusive, end index is exclusive. Indices are zero-indexed, counting bytes of the UTF-8 encoded text. NOTE: some languages, like Javascript, use UTF-16 or Unicode codepoints for string slice indexing; in these languages, convert to byte arrays before working with facets.',
-#~ required: ['byteStart', 'byteEnd'],
-#~ properties: {
-#~ byteStart: {
-#~ type: 'integer',
-#~ minimum: 0,
-#~ },
-#~ byteEnd: {
-#~ type: 'integer',
-#~ minimum: 0,
-#~ },
-#~ },
-#~ },
-#~ },
-#~ },
+        $s;
     }
 };
 1;
@@ -166,6 +55,152 @@ At::RichText - Rich Text Manipulation
     # TODO
 
 =head1 DESCRIPTION
+
+Clients to Bluesky should produce facets using parsers. It's perfectly valid to use a syntax (including markdown or
+HTML) but that syntax should be stripped out of the text before publishing. Whew... anyway, this package attempts to do
+all of that for you.
+
+=head1 Methods
+
+When we sanitize rich text, we have to update the entity indices as the text is modified. This can be modeled as
+C<inserts()> and C<deletes()> of the rich text string. The possible scenarios are outlined below, along with their
+expected behaviors.
+
+NOTE: Slices are start inclusive, end exclusive
+
+This package is object oriented so you'll need to create an initial rich text object to work with.
+
+=head2 C<new( ... )>
+
+    my $rt = At::RichText->new( text=> 'hello world' );
+
+Creates a new object for you.
+
+Expected parameters include:
+
+=over
+
+=item C<text>
+
+Initial plain text for display.
+
+=item C<facets>
+
+List of C<At::Lexicon::app::bsky::richtext::facet> objects. This list is coerced if items aren't blessed.
+
+=back
+
+=head2 C<insert( ... )>
+
+    $rt->insert( 0, 'This is more text' );
+
+Inserts text at a given position and adjusts facets automatically.
+
+Expected parameters include:
+
+=over
+
+=item C<index> - required
+
+=item C<text> - required
+
+=back
+
+Target string:
+
+   0 1 2 3 4 5 6 7 8 910   // string indices
+   h e l l o   w o r l d   // string value
+       ^-------^           // target slice {start: 2, end: 7}
+
+Scenarios:
+
+    A: ^                       // insert "test" at 0
+    B:        ^                // insert "test" at 4
+    C:                 ^       // insert "test" at 8
+
+    A = before           -> move both by num added
+    B = inner            -> move end by num added
+    C = after            -> noop
+
+Results:
+
+    A: 0 1 2 3 4 5 6 7 8 910   // string indices
+       t e s t h e l l o   w   // string value
+                   ^-------^   // target slice {start: 6, end: 11}
+
+    B: 0 1 2 3 4 5 6 7 8 910   // string indices
+       h e l l t e s t o   w   // string value
+           ^---------------^   // target slice {start: 2, end: 11}
+
+    C: 0 1 2 3 4 5 6 7 8 910   // string indices
+       h e l l o   w o t e s   // string value
+           ^-------^           // target slice {start: 2, end: 7}
+
+=head2 C<delete( ... )>
+
+    $rt->delete( 0, 5 );
+
+Deletes text starting at a given position through another position and adjusts facets automatically.
+
+Expected parameters include:
+
+=over
+
+=item C<start> - required
+
+=item C<end> - required
+
+=back
+
+Target string:
+
+       0 1 2 3 4 5 6 7 8 910   // string indices
+       h e l l o   w o r l d   // string value
+           ^-------^           // target slice {start: 2, end: 7}
+
+Scenarios:
+
+    A: ^---------------^       // remove slice {start: 0, end: 9}
+    B:               ^-----^   // remove slice {start: 7, end: 11}
+    C:         ^-----------^   // remove slice {start: 4, end: 11}
+    D:       ^-^               // remove slice {start: 3, end: 5}
+    E:   ^-----^               // remove slice {start: 1, end: 5}
+    F: ^-^                     // remove slice {start: 0, end: 2}
+
+    A = entirely outer   -> delete slice
+    B = entirely after   -> noop
+    C = partially after  -> move end to remove-start
+    D = entirely inner   -> move end by num removed
+    E = partially before -> move start to remove-start index, move end by num removed
+    F = entirely before  -> move both by num removed
+
+Results:
+
+    A: 0 1 2 3 4 5 6 7 8 910   // string indices
+       l d                     // string value
+                               // target slice (deleted)
+
+    B: 0 1 2 3 4 5 6 7 8 910   // string indices
+       h e l l o   w           // string value
+           ^-------^           // target slice {start: 2, end: 7}
+
+    C: 0 1 2 3 4 5 6 7 8 910   // string indices
+       h e l l                 // string value
+           ^-^                 // target slice {start: 2, end: 4}
+
+    D: 0 1 2 3 4 5 6 7 8 910   // string indices
+       h e l   w o r l d       // string value
+           ^---^               // target slice {start: 2, end: 5}
+
+    E: 0 1 2 3 4 5 6 7 8 910   // string indices
+       h   w o r l d           // string value
+         ^-^                   // target slice {start: 1, end: 3}
+
+    F: 0 1 2 3 4 5 6 7 8 910   // string indices
+       l l o   w o r l d       // string value
+       ^-------^               // target slice {start: 0, end: 5}
+
+=head1 Rich Text Manipulation
 
 Rather than allowing a markup language (html, markdown, etc.), posts in Bluesky use so called 'rich text' to handle
 links, mentions, and other kinds of decorated text.
@@ -254,12 +289,6 @@ The visual "atom" of text -- what we think of as a "character". Graphemes are ma
 
 Bluesky uses UTF-8 code units to index facets. Put another way, it uses byte offsets into UTF-8 encoded strings. This
 means you must handle the string in UTF-8 to produce valid indexes.
-
-=head1 Producing Facets
-
-Clients to Bluesky should produce facets using parsers. It's perfectly valid to use a syntax (including markdown or
-HTML) but that syntax should be stripped out of the text before publishing. Whew... anyway, this package attempts to do
-all of that for you.
 
 =head1 See Also
 
