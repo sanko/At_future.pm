@@ -4,6 +4,7 @@ package At::RichText 1.0 {
     no warnings qw[experimental::builtin experimental::class];
     use lib '../../lib';
     use At::Utils;
+    use utf8;
     use overload '""' => sub( $s, $q, $u ) {'TODO'};
     #
     sub new ( $class, %args ) {
@@ -36,6 +37,62 @@ package At::RichText 1.0 {
 
                 # Scenario C (after)
                 # noop?
+            }
+        }
+        $s;
+    }
+
+    sub delete ( $s, $remove_start, $remove_end ) {
+        use bytes;
+        substr( $s->{text}, $remove_start, $remove_end - $remove_start, '' );
+        if ( @{ $s->{facets} } ) {
+            my $numCharsRemoved = $remove_end - $remove_start;
+            for my $ent ( @{ $s->{facets} } ) {
+
+                # Scenario A (entirely outer)
+                if ( $remove_start <= $ent->index->byteStart && $remove_end >= $ent->index->byteEnd ) {
+                    $ent->index->byteStart(0);
+                    $ent->index->byteEnd(0);
+                }
+
+                # Scenario B (entirely after)
+                elsif ( $remove_start > $ent->index->byteEnd ) {
+
+                    # noop
+                }
+
+                # Scenario C (partially after)
+                elsif ( $remove_start > $ent->index->byteStart && $remove_start <= $ent->index->byteEnd && $remove_end > $ent->index->byteEnd ) {
+
+                    # move end to remove start
+                    $ent->index->byteEnd($remove_start);
+                }
+
+                # Scenario D (entirely inner)
+                elsif ( $remove_start >= $ent->index->byteStart && $remove_end <= $ent->index->byteEnd ) {
+
+                    # move end by num removed
+                    $ent->index->byteEnd( $ent->index->byteEnd - $numCharsRemoved );
+                }
+
+                # Scenario E (partially before)
+                elsif ( $remove_start < $ent->index->byteStart && $remove_end >= $ent->index->byteStart && $remove_end <= $ent->index->byteEnd ) {
+
+                    # move start to remove-start index, move end by num removed
+                    $ent->index->byteStart($remove_start);
+                    $ent->index->byteEnd( $ent->index->byteEnd - $numCharsRemoved );
+                }
+
+                # Scenario F (entirely before)
+                elsif ( $remove_end < $ent->index->byteStart ) {
+
+                    # move both by num removed
+                    $ent->index->byteStart( $ent->index->byteStart - $numCharsRemoved );
+                    $ent->index->byteEnd( $ent->index->byteEnd - $numCharsRemoved );
+                }
+
+                # filter out any facets that were made irrelevant
+                $s->{facets} = [ grep { $_->index->byteStart < $_->index->byteEnd } @{ $s->{facets} } ];
             }
         }
         $s;
