@@ -1,6 +1,7 @@
 use Test2::V0 '!subtest';
 use Test2::Util::Importer 'Test2::Tools::Subtest' => ( subtest_streamed => { -as => 'subtest' } );
-use Test2::Plugin::UTF8;
+
+#~ use Test2::Plugin::UTF8;
 use v5.36;
 use lib '../eg/', 'eg', '../lib', 'lib';
 #
