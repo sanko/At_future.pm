@@ -425,7 +425,7 @@ package At 1.0 {
                     elsif ( $schema->{type} eq 'record' ) {
                         _set_capture( join( '.', $raw->{id}, ( $name eq 'main' ? () : $name ) ), $schema );
                     }
-                    elsif ( $schema->{type} eq 'string' )       { _set_capture( $fqdn, $schema ); }
+                    elsif ( $schema->{type} eq 'string' ) { _set_capture( $fqdn, $schema ); }
                     elsif ( $schema->{type} eq 'subscription' ) {
                         #~ use Data::Dump; ddx $schema;
                     }
@@ -1182,7 +1182,7 @@ The AT Protocol identifies methods and records with reverse-DNS names. You can u
     );
 
     my $res3 = At::app::bsky::feed::post::create(
-        $bsky,-
+        $bsky,
         { repo: alice.did },
         {
             text: 'Hello, world!',

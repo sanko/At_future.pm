@@ -606,7 +606,7 @@ my $res2 = At::com::atproto::repo::listRecords(
 );
 
 my $res3 = At::app::bsky::feed::post::create(
-    $bsky,-
+    $bsky,
     { repo: alice.did },
     {
         text: 'Hello, world!',
