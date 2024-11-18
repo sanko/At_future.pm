@@ -4,24 +4,37 @@ package At::RichText 1.0 {
     no warnings qw[experimental::builtin experimental::class];
     use lib '../../lib';
     use At::Utils;
-    use utf8;
+    use bytes;
     use overload '""' => sub( $s, $q, $u ) {'TODO'};
     #
+
+=cfdsa
     sub new ( $class, %args ) {
         $args{text} //= '';
+        #~ utf8::upgrade($args{text});
         $args{facets} = [ map { builtin::blessed $_ ? $_ : At::Lexicon::app::bsky::richtext::facet->new(%$_) } @{ $args{facets} } ];
         bless \%args, $class;
     }
-    sub text($s)           { $s->{text} }
+    sub text($s)           {
+        $s->{text} }
+    sub unicodeText($s)    {
+#~ utf8::encode(my $res = $s->{text});
+#~ $res;
+ $s->{text}
+}
     sub facets($s)         { $s->{facets} }
     sub length($s)         { At::Utils::byteLength $s->{text} }
     sub graphemeLength($s) { At::Utils::graphemeLength $s->{text} }
 
     sub insert( $s, $insert_index, $insert_text ) {
-        use bytes;
-        substr $s->{text}, $insert_index, 0, $insert_text;
+        #~ use bytes;
+     $s->{text}  =~ s[^(\X{$insert_index})][$1$insert_text];
+     warn 'simple: ' . length($insert_text);
+        #~ substr  $insert_index, 0, $insert_text;
         if ( @{ $s->{facets} } ) {
-            my $numCharsAdded = At::Utils::byteLength($insert_text);
+            my $numCharsAdded =
+            At::Utils::byteLength($insert_text);
+            warn 'extra: ' . $numCharsAdded;
             for my $ent ( @{ $s->{facets} } ) {
 
                 # Scenario A (before)
@@ -95,6 +108,71 @@ package At::RichText 1.0 {
                 $s->{facets} = [ grep { $_->index->byteStart < $_->index->byteEnd } @{ $s->{facets} } ];
             }
         }
+        $s;
+    }
+=cut
+
+    #~ use overload '%{}' => sub ($s, $u, $q) {
+    #~ {
+    #~ map {$_ => $$s->{$_}
+    #~ } qw[text facets]
+    #~ }
+    #~ };
+    sub new ($class) {
+        return bless { text => '', facets => [], length => 0 };
+    }
+
+    sub to_post($s) {
+        (
+            text   => $s->{text},
+            facets => [
+                map {
+                    { $_->_raw }
+                } @{ $s->{facets} }
+            ]
+        )
+    }
+
+    sub tag( $s, $text, $tag ) {
+        my $length = At::Utils::byteLength($text);
+        push @{ $s->{facets} },
+            At::Lexicon::app::bsky::richtext::facet->new(
+            index    => { byteStart => $s->{length}, byteEnd => $s->{length} + $length },
+            features => [ { '$type' => 'app.bsky.richtext.facet#tag', tag => $tag } ],
+            );
+        $s->{text} .= $text;
+        $s->{length} = At::Utils::byteLength( $s->{text} );
+        $s;
+    }
+
+    sub mention( $s, $text, $mention ) {
+        my $length = At::Utils::byteLength($text);
+        push @{ $s->{facets} },
+            At::Lexicon::app::bsky::richtext::facet->new(
+            index    => { byteStart => $s->{length}, byteEnd => $s->{length} + $length },
+            features => [ { '$type' => 'app.bsky.richtext.facet#mention', did => $mention } ],
+            );
+        $s->{text} .= $text;
+        $s->{length} = At::Utils::byteLength( $s->{text} );
+        $s;
+    }
+
+    sub link( $s, $text, $link ) {
+        my $length = At::Utils::byteLength($text);
+        push @{ $s->{facets} },
+            At::Lexicon::app::bsky::richtext::facet->new(
+            index    => { byteStart => $s->{length}, byteEnd => $s->{length} + $length },
+            features => [ { '$type' => 'app.bsky.richtext.facet#link', uri => $link } ],
+            );
+        $s->{text} .= $text;
+        $s->{length} = At::Utils::byteLength( $s->{text} );
+        $s;
+    }
+
+    sub text( $s, $text ) {
+        my $length = At::Utils::byteLength($text);
+        $s->{text} .= $text;
+        $s->{length} = At::Utils::byteLength( $s->{text} );
         $s;
     }
 };

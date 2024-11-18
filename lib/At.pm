@@ -146,7 +146,15 @@ package At 1.0 {
         At::app::bsky::feed::getRepostedBy( $s, content => \%args );
     }
 
-    sub post ( $s, %args ) {
+    sub post ( $s, $post, @extra ) {
+        my %args = builtin::blessed $post && $post->isa('At::RichText') ? ( $post->to_post ) : ( $post => @extra );
+        use Data::Dump;
+        ddx {
+            repo       => $s->did,
+            collection => 'app.bsky.feed.post',
+            record     => { '$type' => 'app.bsky.feed.post', createdAt => Time::Moment->now->to_string, %args }
+        };
+        die;
         At::com::atproto::repo::createRecord(
             $s,
             content => {
@@ -334,6 +342,24 @@ package At 1.0 {
 
                     #~ exit;
                 };
+                *{ namespace2package($namespace) . '::_raw' } = sub ($s) {
+                    my %ret;
+
+                    # TODO: verify that data fills schema requirements
+                    #~ ddx $schema;
+                    use Data::Dump;
+                    ddx $s;
+                    for my $property ( keys %{ $schema->{properties} } ) {
+                        $ret{$property}
+                            = ref $s->{$property} eq 'HASH'     ? { map { $_ => $s->{$property}{$_}->_raw } keys %{ $s->{$property} } } :
+                            ref $s->{$property} eq 'ARRAY'      ? [ map { $_->_raw } @{ $s->{$property} } ] :
+                            builtin::blessed( $s->{$property} ) ? ( $s->{$property}->can('_raw') ? $s->{$property}->_raw() :
+                                $s->{$property}->can('as_string') ? $s->{$property}->as_string() :
+                                $s->{$property} ) :
+                            $s->{$property};
+                    }
+                    %ret;
+                };
             }
         }
 
@@ -372,8 +398,11 @@ package At 1.0 {
         while ( my $next = $iter->() ) {
             if ( $next->is_file ) {
                 my $raw = decode_json $next->slurp_utf8;
+
                 for my ( $name, $schema )( %{ $raw->{defs} } ) {
                     my $fqdn = $raw->{id} . ( $name eq 'main' ? '' : '#' . $name );    # RDN
+
+
                     if ( $schema->{type} eq 'array' ) {
                         _set_capture( $fqdn, $schema );
                     }
@@ -427,7 +456,8 @@ package At 1.0 {
                     }
                     elsif ( $schema->{type} eq 'string' ) { _set_capture( $fqdn, $schema ); }
                     elsif ( $schema->{type} eq 'subscription' ) {
-                        #~ use Data::Dump; ddx $schema;
+                        #~ use Data::Dump;
+                        #~ ddx $schema;
                     }
                     elsif ( $schema->{type} eq 'token' ) {    # Generally just a string
                         my $namespace = $fqdn =~ s[[#\.]][::]gr;
