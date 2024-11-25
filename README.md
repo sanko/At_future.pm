@@ -1,4 +1,3 @@
-[![Actions Status](https://github.com/sanko/At_future.pm/actions/workflows/ci.yml/badge.svg)](https://github.com/sanko/At_future.pm/actions) [![MetaCPAN Release](https://badge.fury.io/pl/At.svg)](https://metacpan.org/release/At)
 # NAME
 
 At - The AT Protocol for Social Networking
@@ -7,664 +6,1341 @@ At - The AT Protocol for Social Networking
 
 ```perl
 use At;
-my $bsky = At->new( service => 'https://bsky.social' );
-$bsky->post( text => 'Hi.' );
+my $at = At->new( host => 'https://fun.example' );
+$at->server_createSession( 'sanko', '1111-aaaa-zzzz-0000' );
+$at->repo_createRecord(
+    repo       => $at->did,
+    collection => 'app.bsky.feed.post',
+    record     => { '$type' => 'app.bsky.feed.post', text => 'Hello world! I posted this via the API.', createdAt => time }
+);
 ```
 
 # DESCRIPTION
 
-You shouldn't need to know the AT protocol in order to get things done but it wouldn't hurt if you did.
+Bluesky is backed by the AT Protocol, a "social networking technology created to power the next generation of social
+applications."
 
-# Core Methods
+At.pm uses perl's new class system which requires perl 5.38.x or better and, like the protocol itself, is still under
+development.
 
-This atproto client includes the following methods to cover the most common operations.
+## At::Bluesky
+
+At::Bluesky is a subclass with the host set to `https://bluesky.social` and all the lexicon related to the social
+networking site included.
+
+## App Passwords
+
+Taken from the AT Protocol's official documentation:
+
+<div>
+    <blockquote>
+</div>
+
+For the security of your account, when using any third-party clients, please generate an [app
+password](https://atproto.com/specs/xrpc#app-passwords) at Settings > Advanced > App passwords.
+
+App passwords have most of the same abilities as the user's account password, but they're restricted from destructive
+actions such as account deletion or account migration. They are also restricted from creating additional app passwords.
+
+<div>
+    </blockquote>
+</div>
+
+Read their disclaimer here: [https://atproto.com/community/projects#disclaimer](https://atproto.com/community/projects#disclaimer).
+
+# Methods
+
+The API attempts to follow the layout of the underlying protocol so changes to this module might be beyond my control.
 
 ## `new( ... )`
 
-Creates a new client object.
-
 ```perl
-my $bsky = At->new( service => 'https://example.com' );
+my $at = At->new( host => 'https://bsky.social' );
 ```
+
+Creates an AT client and initiates an authentication session.
 
 Expected parameters include:
 
-- `service` - required
+- `host` - required
 
-    Host for the service.
+    Host for the account. If you're using the 'official' Bluesky, this would be 'https://bsky.social' but you'll probably
+    want `At::Bluesky->new(...)` because that client comes with all the bits that aren't part of the core protocol.
 
-- `language`
-
-    Comma separated string of language codes (e.g. `en-US,en;q=0.9,fr`).
-
-    Bluesky recommends sending the `Accept-Language` header to get posts in the user's preferred language. See
-    [https://www.w3.org/International/questions/qa-lang-priorities.en](https://www.w3.org/International/questions/qa-lang-priorities.en) and
-    [https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry](https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry).
-
-## `did( )`
-
-Gather the DID of the current user. Returns `undef` on failure or if the client is not authenticated.
-
-```
-warn $bsky->did;
-```
-
-# Session Management
-
-You'll need an authenticated session for most API calls. There are two ways to manage sessions:
-
-- 1. Username/password based (deprecated)
-- 2. OAuth based
-
-Developers of new code should be aware that the AT protocol will be [transitioning to OAuth in over the next year or
-so (2024-2025)](https://github.com/bluesky-social/atproto/discussions/2656) and this distribution will comply with this
-change.
-
-## App password based session management
-
-Please note that this auth method is deprecated in favor of OAuth based session management. It is recommended to use
-OAuth based session management but support for this style of auth will remain as long as the Bluesky retains support
-for it.
-
-### `createAccount( ... )`
+## `resume( ... )`
 
 ```perl
-$bsky->createAccount(
-    email      => 'john@example.com',
-    password   => 'hunter2',
-    handle     => 'john.example.com',
-    inviteCode => 'aaaa-bbbb-cccc-dddd'
-);
+my $at = At->resume( $session );
 ```
 
-Create an account if supported by the service.
+Resumes an authenticated session.
 
 Expected parameters include:
+
+- `session` - required
+
+## `session( )`
+
+```perl
+my $restore = $at->session;
+```
+
+Returns data which may be used to resume an authenticated session.
+
+Note that this data is subject to change in line with the AT protocol.
+
+## `admin_deleteAccount( )`
+
+```
+$at->admin_deleteAccount( );
+```
+
+Delete a user account as an administrator.
+
+Expected parameters include:
+
+- `did` - required
+
+## `admin_disableAccountInvites( )`
+
+```
+$at->admin_disableAccountInvites( );
+```
+
+Disable an account from receiving new invite codes, but does not invalidate existing codes.
+
+Expected parameters include:
+
+- `account` - required
+- `note`
+
+    Optional reason for disabled invites.
+
+## `admin_disableInviteCodes( )`
+
+```
+$at->admin_disableInviteCodes( );
+```
+
+Disable some set of codes and/or all codes associated with a set of users.
+
+Expected parameters include:
+
+- `accounts`
+- `codes`
+
+## `admin_enableAccountInvites( )`
+
+```
+$at->admin_enableAccountInvites( );
+```
+
+Re-enable an account's ability to receive invite codes.
+
+Expected parameters include:
+
+- `account` - required
+- `note`
+
+    Optional reason for enabled invites.
+
+## `admin_getAccountInfo( ... )`
+
+```
+$at->admin_getAccountInfo( ... );
+```
+
+Get details about an account.
+
+Expected parameters include:
+
+- `did` - required
+
+## `admin_getAccountInfos( ... )`
+
+```
+$at->admin_getAccountInfos( ... );
+```
+
+Get details about some accounts.
+
+Expected parameters include:
+
+- `dids` - required
+
+## `admin_getInviteCodes( ... )`
+
+```
+$at->admin_getInviteCodes( ... );
+```
+
+Get an admin view of invite codes.
+
+Expected parameters include:
+
+- `cursor`
+- `limit`
+- `sort`
+
+## `admin_getSubjectStatus( ... )`
+
+```
+$at->admin_getSubjectStatus( ... );
+```
+
+Get the service-specific admin status of a subject (account, record, or blob).
+
+Expected parameters include:
+
+- `blob`
+- `did`
+- `uri`
+
+## `admin_searchAccounts( ... )`
+
+```
+$at->admin_searchAccounts( ... );
+```
+
+Get list of accounts that matches your search query.
+
+Expected parameters include:
+
+- `cursor`
+- `email`
+- `limit`
+
+## `admin_sendEmail( )`
+
+```
+$at->admin_sendEmail( );
+```
+
+Send email to a user's account email address.
+
+Expected parameters include:
+
+- `comment`
+
+    Additional comment by the sender that won't be used in the email itself but helpful to provide more context for moderators/reviewers
+
+- `content` - required
+- `recipientDid` - required
+- `senderDid` - required
+- `subject`
+
+## `admin_updateAccountEmail( )`
+
+```
+$at->admin_updateAccountEmail( );
+```
+
+Administrative action to update an account's email.
+
+Expected parameters include:
+
+- `account` - required
+
+    The handle or DID of the repo.
+
+- `email` - required
+
+## `admin_updateAccountHandle( )`
+
+```
+$at->admin_updateAccountHandle( );
+```
+
+Administrative action to update an account's handle.
+
+Expected parameters include:
+
+- `did` - required
+- `handle` - required
+
+## `admin_updateAccountPassword( )`
+
+```
+$at->admin_updateAccountPassword( );
+```
+
+Update the password for a user account as an administrator.
+
+Expected parameters include:
+
+- `did` - required
+- `password` - required
+
+## `admin_updateSubjectStatus( )`
+
+```
+$at->admin_updateSubjectStatus( );
+```
+
+Update the service-specific admin status of a subject (account, record, or blob).
+
+Expected parameters include:
+
+- `deactivated`
+- `subject` - required
+- `takedown`
+
+## `identity_getRecommendedDidCredentials( )`
+
+```
+$at->identity_getRecommendedDidCredentials( );
+```
+
+Describe the credentials that should be included in the DID doc of an account that is migrating to this service.
+
+## `identity_requestPlcOperationSignature( )`
+
+```
+$at->identity_requestPlcOperationSignature( );
+```
+
+Request an email with a code to in order to request a signed PLC operation. Requires Auth.
+
+Expected parameters include:
+
+## `identity_resolveHandle( ... )`
+
+```
+$at->identity_resolveHandle( ... );
+```
+
+Resolves a handle (domain name) to a DID.
+
+Expected parameters include:
+
+- `handle` - required
+
+    The handle to resolve.
+
+## `identity_signPlcOperation( )`
+
+```
+$at->identity_signPlcOperation( );
+```
+
+Signs a PLC operation to update some value(s) in the requesting DID's document.
+
+Expected parameters include:
+
+- `alsoKnownAs`
+- `rotationKeys`
+- `services`
+- `token`
+
+    A token received through com.atproto.identity.requestPlcOperationSignature
+
+- `verificationMethods`
+
+## `identity_submitPlcOperation( )`
+
+```
+$at->identity_submitPlcOperation( );
+```
+
+Validates a PLC operation to ensure that it doesn't violate a service's constraints or get the identity into a bad state, then submits it to the PLC registry
+
+Expected parameters include:
+
+- `operation` - required
+
+## `identity_updateHandle( )`
+
+```
+$at->identity_updateHandle( );
+```
+
+Updates the current account's handle. Verifies handle validity, and updates did:plc document if necessary. Implemented by PDS, and requires auth.
+
+Expected parameters include:
+
+- `handle` - required
+
+    The new handle.
+
+## `label_queryLabels( ... )`
+
+```
+$at->label_queryLabels( ... );
+```
+
+Find labels relevant to the provided AT-URI patterns. Public endpoint for moderation services, though may return different or additional results with auth.
+
+Expected parameters include:
+
+- `cursor`
+- `limit`
+- `sources`
+
+    Optional list of label sources (DIDs) to filter on.
+
+- `uriPatterns` - required
+
+    List of AT URI patterns to match (boolean 'OR'). Each may be a prefix (ending with '\*'; will match inclusive of the string leading to '\*'), or a full URI.
+
+## `moderation_createReport( )`
+
+```
+$at->moderation_createReport( );
+```
+
+Submit a moderation report regarding an atproto account or record. Implemented by moderation services (with PDS proxying), and requires auth.
+
+Expected parameters include:
+
+- `reason`
+
+    Additional context about the content and violation.
+
+- `reasonType` - required
+
+    Indicates the broad category of violation the report is for.
+
+- `subject` - required
+
+## `repo_applyWrites( )`
+
+```
+$at->repo_applyWrites( );
+```
+
+Apply a batch transaction of repository creates, updates, and deletes. Requires auth, implemented by PDS.
+
+Expected parameters include:
+
+- `repo` - required
+
+    The handle or DID of the repo (aka, current account).
+
+- `swapCommit`
+
+    If provided, the entire operation will fail if the current repo commit CID does not match this value. Used to prevent conflicting repo mutations.
+
+- `validate`
+
+    Can be set to 'false' to skip Lexicon schema validation of record data across all operations, 'true' to require it, or leave unset to validate only for known Lexicons.
+
+- `writes` - required
+
+Known errors:
+
+- `InvalidSwap`
+
+    Indicates that the 'swapCommit' parameter did not match current commit.
+
+## `repo_createRecord( )`
+
+```
+$at->repo_createRecord( );
+```
+
+Create a single new repository record. Requires auth, implemented by PDS.
+
+Expected parameters include:
+
+- `collection` - required
+
+    The NSID of the record collection.
+
+- `record` - required
+
+    The record itself. Must contain a $type field.
+
+- `repo` - required
+
+    The handle or DID of the repo (aka, current account).
+
+- `rkey`
+
+    The Record Key.
+
+- `swapCommit`
+
+    Compare and swap with the previous commit by CID.
+
+- `validate`
+
+    Can be set to 'false' to skip Lexicon schema validation of record data, 'true' to require it, or leave unset to validate only for known Lexicons.
+
+Known errors:
+
+- `InvalidSwap`
+
+    Indicates that 'swapCommit' didn't match current repo commit.
+
+## `repo_deleteRecord( )`
+
+```
+$at->repo_deleteRecord( );
+```
+
+Delete a repository record, or ensure it doesn't exist. Requires auth, implemented by PDS.
+
+Expected parameters include:
+
+- `collection` - required
+
+    The NSID of the record collection.
+
+- `repo` - required
+
+    The handle or DID of the repo (aka, current account).
+
+- `rkey` - required
+
+    The Record Key.
+
+- `swapCommit`
+
+    Compare and swap with the previous commit by CID.
+
+- `swapRecord`
+
+    Compare and swap with the previous record by CID.
+
+Known errors:
+
+- `InvalidSwap`
+
+## `repo_describeRepo( ... )`
+
+```
+$at->repo_describeRepo( ... );
+```
+
+Get information about an account and repository, including the list of collections. Does not require auth.
+
+Expected parameters include:
+
+- `repo` - required
+
+    The handle or DID of the repo.
+
+## `repo_getRecord( ... )`
+
+```
+$at->repo_getRecord( ... );
+```
+
+Get a single record from a repository. Does not require auth.
+
+Expected parameters include:
+
+- `cid`
+
+    The CID of the version of the record. If not specified, then return the most recent version.
+
+- `collection` - required
+
+    The NSID of the record collection.
+
+- `repo` - required
+
+    The handle or DID of the repo.
+
+- `rkey` - required
+
+    The Record Key.
+
+Known errors:
+
+- `RecordNotFound`
+
+## `repo_importRepo( )`
+
+```
+$at->repo_importRepo( );
+```
+
+Import a repo in the form of a CAR file. Requires Content-Length HTTP header to be set.
+
+Expected parameters include:
+
+## `repo_listMissingBlobs( ... )`
+
+```
+$at->repo_listMissingBlobs( ... );
+```
+
+Returns a list of missing blobs for the requesting account. Intended to be used in the account migration flow.
+
+Expected parameters include:
+
+- `cursor`
+- `limit`
+
+## `repo_listRecords( ... )`
+
+```
+$at->repo_listRecords( ... );
+```
+
+List a range of records in a repository, matching a specific collection. Does not require auth.
+
+Expected parameters include:
+
+- `collection` - required
+
+    The NSID of the record type.
+
+- `cursor`
+- `limit`
+
+    The number of records to return.
+
+- `repo` - required
+
+    The handle or DID of the repo.
+
+- `reverse`
+
+    Flag to reverse the order of the returned records.
+
+- `rkeyEnd`
+
+    DEPRECATED: The highest sort-ordered rkey to stop at (exclusive)
+
+- `rkeyStart`
+
+    DEPRECATED: The lowest sort-ordered rkey to start from (exclusive)
+
+## `repo_putRecord( )`
+
+```
+$at->repo_putRecord( );
+```
+
+Write a repository record, creating or updating it as needed. Requires auth, implemented by PDS.
+
+Expected parameters include:
+
+- `collection` - required
+
+    The NSID of the record collection.
+
+- `record` - required
+
+    The record to write.
+
+- `repo` - required
+
+    The handle or DID of the repo (aka, current account).
+
+- `rkey` - required
+
+    The Record Key.
+
+- `swapCommit`
+
+    Compare and swap with the previous commit by CID.
+
+- `swapRecord`
+
+    Compare and swap with the previous record by CID. WARNING: nullable and optional field; may cause problems with golang implementation
+
+- `validate`
+
+    Can be set to 'false' to skip Lexicon schema validation of record data, 'true' to require it, or leave unset to validate only for known Lexicons.
+
+Known errors:
+
+- `InvalidSwap`
+
+## `repo_uploadBlob( )`
+
+```
+$at->repo_uploadBlob( );
+```
+
+Upload a new blob, to be referenced from a repository record. The blob will be deleted if it is not referenced within a time window (eg, minutes). Blob restrictions (mimetype, size, etc) are enforced when the reference is created. Requires auth, implemented by PDS.
+
+Expected parameters include:
+
+## `server_activateAccount( )`
+
+```
+$at->server_activateAccount( );
+```
+
+Activates a currently deactivated account. Used to finalize account migration after the account's repo is imported and identity is setup.
+
+Expected parameters include:
+
+## `server_checkAccountStatus( )`
+
+```
+$at->server_checkAccountStatus( );
+```
+
+Returns the status of an account, especially as pertaining to import or recovery. Can be called many times over the course of an account migration. Requires auth and can only be called pertaining to oneself.
+
+## `server_confirmEmail( )`
+
+```
+$at->server_confirmEmail( );
+```
+
+Confirm an email using a token from com.atproto.server.requestEmailConfirmation.
+
+Expected parameters include:
+
+- `email` - required
+- `token` - required
+
+Known errors:
+
+- `AccountNotFound`
+- `ExpiredToken`
+- `InvalidToken`
+- `InvalidEmail`
+
+## `server_createAccount( )`
+
+```
+$at->server_createAccount( );
+```
+
+Create an account. Implemented by PDS.
+
+Expected parameters include:
+
+- `did`
+
+    Pre-existing atproto DID, being imported to a new account.
 
 - `email`
 - `handle` - required
 
     Requested handle for the account.
 
-- `did`
-
-    Pre-existing atproto DID, being imported to a new account.
-
 - `inviteCode`
-- `verificationCode`
-- `verificationPhone`
 - `password`
 
     Initial account password. May need to meet instance-specific password strength requirements.
+
+- `plcOp`
+
+    A signed DID PLC operation to be submitted as part of importing an existing account to this instance. NOTE: this optional field may be updated when full account migration is implemented.
 
 - `recoveryKey`
 
     DID PLC rotation key (aka, recovery key) to be included in PLC creation operation.
 
-- `plcOp`
+- `verificationCode`
+- `verificationPhone`
 
-    A signed DID PLC operation to be submitted as part of importing an existing account to this instance.
+Known errors:
 
-    NOTE: this optional field may be updated when full account migration is implemented.
+- `InvalidHandle`
+- `InvalidPassword`
+- `InvalidInviteCode`
+- `HandleNotAvailable`
+- `UnsupportedDomain`
+- `UnresolvableDid`
+- `IncompatibleDidDoc`
 
-Account login session returned on successful account creation.
+## `server_createAppPassword( )`
 
-### `login( ... )`
-
-Create an app password backed authentication session.
-
-```perl
-my $session = $bsky->login(
-    identifier => 'john@example.com',
-    password   => '1111-2222-3333-4444'
-);
 ```
+$at->server_createAppPassword( );
+```
+
+Create an App Password.
 
 Expected parameters include:
 
+- `name` - required
+
+    A short name for the App Password, to help distinguish them.
+
+- `privileged`
+
+    If an app password has 'privileged' access to possibly sensitive account state. Meant for use with trusted clients.
+
+Known errors:
+
+- `AccountTakedown`
+
+## `server_createInviteCode( )`
+
+```
+$at->server_createInviteCode( );
+```
+
+Create an invite code.
+
+Expected parameters include:
+
+- `forAccount`
+- `useCount` - required
+
+## `server_createInviteCodes( )`
+
+```
+$at->server_createInviteCodes( );
+```
+
+Create invite codes.
+
+Expected parameters include:
+
+- `codeCount` - required
+- `forAccounts`
+- `useCount` - required
+
+## `server_createSession( )`
+
+```
+$at->server_createSession( );
+```
+
+Create an authentication session.
+
+Expected parameters include:
+
+- `authFactorToken`
 - `identifier` - required
 
     Handle or other identifier supported by the server for the authenticating user.
 
 - `password` - required
 
-    This is the app password not the account's password. App passwords are generated at
-    [https://bsky.app/settings/app-passwords](https://bsky.app/settings/app-passwords).
+Known errors:
 
-- `authFactorToken`
+- `AccountTakedown`
+- `AuthFactorTokenRequired`
 
-Returns an authorized session on success.
+## `server_deactivateAccount( )`
 
-### `resumeSession( ... )`
-
-Resumes an app password based session.
-
-```perl
-$bsky->resumeSession(
-    accessJwt => '...',
-    resumeJwt => '...'
-);
 ```
+$at->server_deactivateAccount( );
+```
+
+Deactivates a currently active account. Stops serving of repo, and future writes to repo until reactivated. Used to finalize account migration with the old host after the account has been activated on the new host.
 
 Expected parameters include:
 
-- `accessJwt` - required
-- `refreshJwt` - required
+- `deleteAfter`
 
-If the `accessJwt` token has expired, we attempt to use the `refreshJwt` to continue the session with a new token. If
-that also fails, well, that's kinda it.
+    A recommendation to server as to how long they should hold onto the deactivated account before deleting.
 
-The new session is returned on success.
+## `server_deleteAccount( )`
 
-## OAuth based session management
-
-Yeah, this is on the TODO list.
-
-# Feeds and Content Methods
-
-Most of a core client's functionality is covered by these methods.
-
-## `getTimeline( ... )`
-
-Get a view of the requesting account's home timeline. This is expected to be some form of reverse-chronological feed.
-
-```perl
-my $timeline = $bsky->getTimeline( );
 ```
+$at->server_deleteAccount( );
+```
+
+Delete an actor's account with a token and password. Can only be called after requesting a deletion token. Requires auth.
 
 Expected parameters include:
 
-- `algorithm`
+- `did` - required
+- `password` - required
+- `token` - required
 
-    Variant 'algorithm' for timeline. Implementation-specific.
+Known errors:
 
-    NOTE: most feed flexibility has been moved to feed generator mechanism.
+- `ExpiredToken`
+- `InvalidToken`
 
-- `limit`
+## `server_deleteSession( )`
 
-    Integer in the range of `1 .. 100`; the default is `50`.
-
-- `cursor`
-
-    Paginination support.
-
-## `getAuthorFeed( ... )`
-
-Get a view of an actor's 'author feed' (post and reposts by the author). Does not require auth.
-
-```perl
-my $feed = $bsky->getAuthorFeed(
-    actor  => 'did:plc:z72i7hdynmk6r22z27h6tvur',
-    filter => 'posts_and_author_threads',
-    limit  =>  30
-);
 ```
+$at->server_deleteSession( );
+```
+
+Delete the current session. Requires auth.
 
 Expected parameters include:
 
-- `actor` - required
+## `server_describeServer( )`
 
-    The DID of the author whose posts you'd like to fetch.
-
-- `limit`
-
-    The number of posts to return per page in the range of `1 .. 100`; the default is `50`.
-
-- `cursor`
-
-    A cursor that tells the server where to paginate from.
-
-- `filter`
-
-    The type of posts you'd like to receive in the response.
-
-    Known values:
-
-    - `posts_with_replies` - default
-    - `posts_no_replies`
-    - `posts_with_media`
-    - `posts_and_author_threads`
-
-## `getPostThread( ... )`
-
-Get posts in a thread. Does not require auth, but additional metadata and filtering will be applied for authed
-requests.
-
-```perl
-$at->getPostThread(
-    uri => 'at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3l2s5xxv2ze2c'
-);
 ```
+$at->server_describeServer( );
+```
+
+Describes the server's account creation requirements and capabilities. Implemented by PDS.
+
+## `server_getAccountInviteCodes( ... )`
+
+```
+$at->server_getAccountInviteCodes( ... );
+```
+
+Get all invite codes for the current account. Requires auth.
 
 Expected parameters include:
 
-- `uri` - required
+- `createAvailable`
 
-    Reference (AT-URI) to post record.
+    Controls whether any new 'earned' but not 'created' invites should be created.
 
-- `depth`
+- `includeUsed`
 
-    How many levels of reply depth should be included in response between `0` and `1000`.
+Known errors:
 
-    Default is `6`.
+- `DuplicateCreate`
 
-- `parentHeight`
+## `server_getServiceAuth( ... )`
 
-    How many levels of parent (and grandparent, etc) post to include between `0` and `1000`.
-
-    Default is `80`.
-
-## `getPost( ... )`
-
-Gets a single post view for a specified AT-URI.
-
-```perl
-my $post = $at->getPost('at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3l2s5xxv2ze2c');
 ```
+$at->server_getServiceAuth( ... );
+```
+
+Get a signed token on behalf of the requesting DID for the requested service.
 
 Expected parameters include:
 
-- `uri` - required
+- `aud` - required
 
-    Reference (AT-URI) to post record.
+    The DID of the service that the token will be used to authenticate with
 
-## `getPosts( ... )`
+- `exp`
 
-Gets post views for a specified list of posts (by AT-URI). This is sometimes referred to as 'hydrating' a 'feed
-skeleton'.
+    The time in Unix Epoch seconds that the JWT expires. Defaults to 60 seconds in the future. The service may enforce certain time bounds on tokens depending on the requested scope.
 
-```perl
-my $posts = $at->getPosts(
-    uris => [
-        'at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3l2s5xxv2ze2c',
-        'at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3kvu5vjfups25',
-        'at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3l2s5luwyg22t'
-    ]
-);
+- `lxm`
+
+    Lexicon (XRPC) method to bind the requested token to
+
+Known errors:
+
+- `BadExpiration`
+
+    Indicates that the requested expiration date is not a valid. May be in the past or may be reliant on the requested scopes.
+
+## `server_getSession( )`
+
 ```
+$at->server_getSession( );
+```
+
+Get information about the current auth session. Requires auth.
+
+## `server_listAppPasswords( )`
+
+```
+$at->server_listAppPasswords( );
+```
+
+List all App Passwords.
+
+Known errors:
+
+- `AccountTakedown`
+
+## `server_refreshSession( )`
+
+```
+$at->server_refreshSession( );
+```
+
+Refresh an authentication session. Requires auth using the 'refreshJwt' (not the 'accessJwt').
 
 Expected parameters include:
 
-- `uris` - required
+Known errors:
 
-    List of (at most 25) post AT-URIs to return hydrated views for.
+- `AccountTakedown`
 
-## `getLikes( ... )`
+## `server_requestAccountDelete( )`
 
-Get like records which reference a subject (by AT-URI and CID).
-
-```perl
-my $likes = $at->getLikes( uri => 'at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3l2s5xxv2ze2c' );
 ```
+$at->server_requestAccountDelete( );
+```
+
+Initiate a user account deletion via email.
 
 Expected parameters include:
 
-- `uri` - required
+## `server_requestEmailConfirmation( )`
 
-    AT-URI of the subject (eg, a post record).
-
-- `cid`
-
-    CID of the subject record (aka, specific version of record), to filter likes.
-
-- `limit`
-
-    The number of likes to return per page in the range of `1 .. 100`; the default is `50`.
-
-- `cursor`
-
-## `getRepostedBy( ... )`
-
-Get a list of reposts for a given post.
-
-```perl
-my $likes = $at->getRepostedBy( uri => 'at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3l2s5xxv2ze2c' );
 ```
+$at->server_requestEmailConfirmation( );
+```
+
+Request an email with a code to confirm ownership of email.
 
 Expected parameters include:
 
-- `uri` - required
+## `server_requestEmailUpdate( )`
 
-    Reference (AT-URI) of post record.
-
-- `cid`
-
-    If supplied, filters to reposts of specific version (by CID) of the post record.
-
-- `limit`
-
-    The number of reposts to return per page in the range of `1 .. 100`; the default is `50`.
-
-- `cursor`
-
-## `post( ... )`
-
-Get a list of reposts for a given post.
-
-```perl
-my $post = $at->post( text => 'Pretend this is super funny.' );
 ```
+$at->server_requestEmailUpdate( );
+```
+
+Request a token in order to update email.
 
 Expected parameters include:
 
-- `text` - required
-
-    The primary post content. May be an empty string, if there are embeds.
-
-- `cid`
-
-    If supplied, filters to reposts of specific version (by CID) of the post record.
-
-- `facets`
-
-    Annotations of text (mentions, URLs, hashtags, etc).
-
-- `reply`
-- `embed`
-
-    List of images, videos, etc. to display.
-
-- `langs`
-
-    Indicates human language of post primary text content.
-
-- `tags`
-
-    Additional hashtags, in addition to any included in post text and facets.
-
-- `createdAt`
-
-    Client-declared timestamp when this post was originally created.
-
-    If undefined, we fill this in with `<Time::Moment->now`>.
-
-## `deletePost( ... )`
+## `server_requestPasswordReset( )`
 
 ```
-$at->deletePost( $post->{uri} );
+$at->server_requestPasswordReset( );
 ```
 
-Delete a post.
+Initiate a user account password reset via email.
 
-- `uri` - required
+Expected parameters include:
 
-    AT-URI link for the post to delete.
+- `email` - required
 
-## `like( ... )`
+## `server_reserveSigningKey( )`
 
-```perl
-my $like = $at->like( $post->{uri}, $post->{cid} );
+```
+$at->server_reserveSigningKey( );
 ```
 
-Like a post. Note that likes are public.
+Reserve a repo signing key, for use with account creation. Necessary so that a DID PLC update operation can be constructed during an account migraiton. Public and does not require auth; implemented by PDS. NOTE: this endpoint may change when full account migration is implemented.
 
-- `uri` - required
+Expected parameters include:
 
-    AT-URI link for the post to delete.
+- `did`
+
+    The DID to reserve a key for.
+
+## `server_resetPassword( )`
+
+```
+$at->server_resetPassword( );
+```
+
+Reset a user account password using a token.
+
+Expected parameters include:
+
+- `password` - required
+- `token` - required
+
+Known errors:
+
+- `ExpiredToken`
+- `InvalidToken`
+
+## `server_revokeAppPassword( )`
+
+```
+$at->server_revokeAppPassword( );
+```
+
+Revoke an App Password by name.
+
+Expected parameters include:
+
+- `name` - required
+
+## `server_updateEmail( )`
+
+```
+$at->server_updateEmail( );
+```
+
+Update an account's email.
+
+Expected parameters include:
+
+- `email` - required
+- `emailAuthFactor`
+- `token`
+
+    Requires a token from com.atproto.sever.requestEmailUpdate if the account's email has been confirmed.
+
+Known errors:
+
+- `ExpiredToken`
+- `InvalidToken`
+- `TokenRequired`
+
+## `sync_getBlob( ... )`
+
+```
+$at->sync_getBlob( ... );
+```
+
+Get a blob associated with a given account. Returns the full blob as originally uploaded. Does not require auth; implemented by PDS.
+
+Expected parameters include:
 
 - `cid` - required
 
-    [CID](https://docs.ipfs.tech/concepts/content-addressing/#identifier-formats) of the post.
+    The CID of the blob to fetch
 
-## `deleteLike( ... )`
+- `did` - required
+
+    The DID of the account.
+
+Known errors:
+
+- `BlobNotFound`
+- `RepoNotFound`
+- `RepoTakendown`
+- `RepoSuspended`
+- `RepoDeactivated`
+
+## `sync_getBlocks( ... )`
 
 ```
-$bsky->deleteLike ( $like->{uri} );
+$at->sync_getBlocks( ... );
 ```
 
-Removes a like.
-
-## `repost( ... )`
-
-```perl
-my $repost = $bsky->repost( $post->{uri}, $post->{cid} ),
-```
-
-Reposts content. Note that reposts are public.
+Get data blocks from a given repo, by CID. For example, intermediate MST nodes, or records. Does not require auth; implemented by PDS.
 
 Expected parameters include:
 
-- `uri` - required
-- `cid` - required
+- `cids` - required
+- `did` - required
 
-## `deleteRepost( ... )`
+    The DID of the repo.
 
-```perl
-my $repost = $bsky->deleteRepost( $repost->{uri} ),
+Known errors:
+
+- `BlockNotFound`
+- `RepoNotFound`
+- `RepoTakendown`
+- `RepoSuspended`
+- `RepoDeactivated`
+
+## `sync_getCheckout( ... )`
+
+```
+$at->sync_getCheckout( ... );
 ```
 
-Removes a repost.
+DEPRECATED - please use com.atproto.sync.getRepo instead
 
 Expected parameters include:
 
-- `uri` - required
+- `did` - required
 
-## `uploadBlob( ... )`
+    The DID of the repo.
 
-```perl
-my $blob = $bsky->uploadBlob( $data, 'image/jpeg' );
+## `sync_getHead( ... )`
+
+```
+$at->sync_getHead( ... );
 ```
 
-Upload a new blob, to be referenced from a repository record.
+DEPRECATED - please use com.atproto.sync.getLatestCommit instead
 
 Expected parameters include:
 
-- `data` - required
+- `did` - required
 
-    Raw data to sent.
+    The DID of the repo.
 
-- `mimetype`
+Known errors:
 
-The blob will be deleted if it is not referenced within a time window (eg, minutes). Blob restrictions (mimetype, size,
-etc) are enforced when the reference is created. Requires auth, implemented by PDS.
+- `HeadNotFound`
 
-# Social Graph Methods
+## `sync_getLatestCommit( ... )`
 
-Methods dealing with social relationships between accounts are listed here.
-
-## `getFollows( ... )`
-
-```perl
-my $follows = $bsky->getFollows( 'did:plc:pwqewimhd3rxc4hg6ztwrcyj' );
+```
+$at->sync_getLatestCommit( ... );
 ```
 
-Enumerates accounts which a specified account (actor) follows.
+Get the current commit CID & revision of the specified repo. Does not require auth.
 
 Expected parameters include:
 
-- `actor` - required
-- `limit`
+- `did` - required
 
-    The number of results to return per request.
+    The DID of the repo.
 
-    This must be between `1` and `100` (inclusive) and is `50` by default.
+Known errors:
+
+- `RepoNotFound`
+- `RepoTakendown`
+- `RepoSuspended`
+- `RepoDeactivated`
+
+## `sync_getRecord( ... )`
+
+```
+$at->sync_getRecord( ... );
+```
+
+Get data blocks needed to prove the existence or non-existence of record in the current version of repo. Does not require auth.
+
+Expected parameters include:
+
+- `collection` - required
+- `commit`
+
+    DEPRECATED: referenced a repo commit by CID, and retrieved record as of that commit
+
+- `did` - required
+
+    The DID of the repo.
+
+- `rkey` - required
+
+    Record Key
+
+Known errors:
+
+- `RecordNotFound`
+- `RepoNotFound`
+- `RepoTakendown`
+- `RepoSuspended`
+- `RepoDeactivated`
+
+## `sync_getRepo( ... )`
+
+```
+$at->sync_getRepo( ... );
+```
+
+Download a repository export as CAR file. Optionally only a 'diff' since a previous revision. Does not require auth; implemented by PDS.
+
+Expected parameters include:
+
+- `did` - required
+
+    The DID of the repo.
+
+- `since`
+
+    The revision ('rev') of the repo to create a diff from.
+
+Known errors:
+
+- `RepoNotFound`
+- `RepoTakendown`
+- `RepoSuspended`
+- `RepoDeactivated`
+
+## `sync_getRepoStatus( ... )`
+
+```
+$at->sync_getRepoStatus( ... );
+```
+
+Get the hosting status for a repository, on this server. Expected to be implemented by PDS and Relay.
+
+Expected parameters include:
+
+- `did` - required
+
+    The DID of the repo.
+
+Known errors:
+
+- `RepoNotFound`
+
+## `sync_listBlobs( ... )`
+
+```
+$at->sync_listBlobs( ... );
+```
+
+List blob CIDs for an account, since some repo revision. Does not require auth; implemented by PDS.
+
+Expected parameters include:
 
 - `cursor`
+- `did` - required
 
-    Paginination support.
+    The DID of the repo.
 
-## `getFollowers( ... )`
+- `limit`
+- `since`
 
-```perl
-my $followers = $bsky->getFollowers( 'did:plc:pwqewimhd3rxc4hg6ztwrcyj' );
+    Optional revision of the repo to list blobs since.
+
+Known errors:
+
+- `RepoNotFound`
+- `RepoTakendown`
+- `RepoSuspended`
+- `RepoDeactivated`
+
+## `sync_listRepos( ... )`
+
+```
+$at->sync_listRepos( ... );
 ```
 
-Enumerates accounts which follow a specified account (actor).
+Enumerates all the DID, rev, and commit CID for all repos hosted by this service. Does not require auth; implemented by PDS and Relay.
 
 Expected parameters include:
-
-- `actor` - required
-- `limit`
-
-    The number of results to return per request.
-
-    This must be between `1` and `100` (inclusive) and is `50` by default.
 
 - `cursor`
+- `limit`
 
-    Paginination support.
+## `sync_notifyOfUpdate( )`
 
-## `follow( ... )`
-
-```perl
-my $follow = $bsky->follow( 'did:plc:pwqewimhd3rxc4hg6ztwrcyj' );
+```
+$at->sync_notifyOfUpdate( );
 ```
 
-Create a record declaring a social 'follow' relationship of another account.
+Notify a crawling service of a recent update, and that crawling should resume. Intended use is after a gap between repo stream events caused the crawling service to disconnect. Does not require auth; implemented by Relay.
 
 Expected parameters include:
 
-- `subject` - required
+- `hostname` - required
 
-    The account you'd like to follow.
+    Hostname of the current service (usually a PDS) that is notifying of update.
 
-- `createdAt`
-
-    Client-declared timestamp when this post was originally created.
-
-    If undefined, we fill this in with `<Time::Moment->now`>.
-
-Duplicate follows will be ignored by the AppView.
-
-## `deleteFollow( ... )`
+## `sync_requestCrawl( )`
 
 ```
-$bsky->deleteFollow( $follow->{uri} );
+$at->sync_requestCrawl( );
 ```
 
-Delete a 'follow' relationship.
+Request a service to persistently crawl hosted repos. Expected use is new PDS instances declaring their existence to Relays. Does not require auth.
 
 Expected parameters include:
 
-- `uri` - required
+- `hostname` - required
 
-# Actor Methods
+    Hostname of the current service (eg, PDS) that is requesting to be crawled.
 
-Methods related to Bluesky accounts or 'actors' are listed here.
+## `temp_checkSignupQueue( )`
 
-## `getProfile( ... )`
-
-```perl
-my $profile = $bsky->getProfile( 'did:plc:pwqewimhd3rxc4hg6ztwrcyj' );
+```
+$at->temp_checkSignupQueue( );
 ```
 
-Get detailed profile view of an actor. Does not require auth, but contains relevant metadata with auth.
+Check accounts location in signup queue.
+
+## `temp_fetchLabels( ... )`
+
+```
+$at->temp_fetchLabels( ... );
+```
+
+DEPRECATED: use queryLabels or subscribeLabels instead -- Fetch all labels from a labeler created after a certain date.
 
 Expected parameters include:
 
-- `actor` - required
+- `limit`
+- `since`
 
-    Handle or DID of account to fetch profile of.
+## `temp_requestPhoneVerification( )`
 
-## `upsertProfile( ... )`
-
-```perl
-my $commit = $bsky->upsertProfile( sub (%current) { ... } );
+```
+$at->temp_requestPhoneVerification( );
 ```
 
-Pull your current profile and merge it with new content.
+Request a verification code to be sent to the supplied phone number
 
 Expected parameters include:
 
-- `function` - required
-
-    This is a callback that is handed the current profile. The return value is then passed along to update or insert the
-    Bluesky profile record.
-
-- `attempts`
-
-    How many attempts should be made to gather the current profile if it exists.
-
-    The current default is `5` which emulates the behavior in the official client.
-
-# Advanced API Calls
-
-The methods above are convenience wrappers. It covers most but not all available methods.
-
-The AT Protocol identifies methods and records with reverse-DNS names. You can use them on the agent as well:
-
-```perl
-my $res1 = At::com::atproto::repo::createRecord(
-    $bsky,
-    content => {
-        did        => 'alice.did',
-        collection => 'app.bsky.feed.post',
-        record     => {
-            '$type'  => 'app.bsky.feed.post',
-            text      => 'Hello, world!',
-            createdAt => Time::Moment->now->to_string
-        }
-    }
-);
-
-my $res2 = At::com::atproto::repo::listRecords(
-    $bsky,
-    content => {
-      repo       => 'alice.did',
-      collection => 'app.bsky.feed.post'
-    }
-);
-
-my $res3 = At::app::bsky::feed::post::create(
-    $bsky,
-    { repo: alice.did },
-    {
-        text: 'Hello, world!',
-            createdAt => Time::Moment->now->to_string
-    }
-);
-
-my $res4 = At::app::bsky::feed::post::list($bsky, content => { repo: 'alice.did' });
-```
-
-# Rich Text
-
-Some records (posts, etc.) use the `app.bsky.richtext` lexicon. At the moment, richtext is only used for links and
-mentions, but it will be extended over time to include bold, italic, and so on.
-
-```perl
-my $rt = At::RichText->new(
-    text => 'Hello @alice.com, check out this link: https://example.com'
-);
-$rt->detectFacets($agent); # Automatically detects mentions and links
-my $postRecord = {
-    '$type'   => 'app.bsky.feed.post',
-    text      => $rt->text,
-    facets    => $rt->facets,
-    createdAt => Time::Moment->new->to_string
-};
-
-# Rendering as markdown
-my $markdown = '';
-for my $segment ($rt->segments){
-    if ($segment->isLink()) {
-        $markdown .= sprintf '[%s](%s)', $segment->text, $segment->link->uri
-    }
-    elsif($segment->isMention()){
-        $markdown .= sprintf '[%s](https://my-bsky-app.com/user/%s)', $segment->text, $segment->mention->did
-    }
-    else{
-    $markdown .= $segment->text
-}
-
-# calculating string lengths
-my $rt2 = At::RichText->new(text => 'Hello');
-warn $rt2->length; # 5
-warn $rt2->graphemeLength; # 5
-my $rt3 = At::RichText->new(text => '👨‍👩‍👧‍👧');
-warn $rt3->length; # 25
-warn $rt3->graphemeLength; # 1
-```
-
-# Error Handling
-
-Exception handling is carried out by returning objects with untrue boolean values.
+- `phoneNumber` - required
 
 # See Also
 
 [App::bsky](https://metacpan.org/pod/App%3A%3Absky) - Bluesky client on the command line
 
-[https://docs.bsky.app/docs/api/](https://docs.bsky.app/docs/api/)
+[https://atproto.com/](https://atproto.com/)
+
+[https://bsky.app/profile/atperl.bsky.social](https://bsky.app/profile/atperl.bsky.social)
+
+[Bluesky on Wikipedia.org](https://en.wikipedia.org/wiki/Bluesky_\(social_network\))
 
 # LICENSE
 
